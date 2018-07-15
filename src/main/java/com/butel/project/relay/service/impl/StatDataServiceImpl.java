@@ -16,6 +16,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StopWatch;
 
 import java.util.*;
 
@@ -42,27 +43,31 @@ public class StatDataServiceImpl implements IStatDataService {
     @Override
     public void decode(HashMap <Long, Packet> packets, long startTime, long endTime,
                        String superSocketID, StatObjType statObjType, StatDataType statDataType, Axis axis) {
+        StopWatch watch = new StopWatch();
+        watch.start("DB 操作");
         List <StatDataEntity> statDataEntities = statDataDao.queryStatData(startTime,
                 endTime, superSocketID, statObjType, statDataType);
+        watch.stop();
+        watch.start("数据处理");
+        statDataEntities.stream().forEach(statDataEntity -> parseStatData(packets, statDataEntity, axis));
+        watch.stop();
         if (log.isDebugEnabled())
-            log.debug("本次查询记录：【{}】条", statDataEntities.size());
-        for (int i = 0; i < statDataEntities.size(); i++) {
-            StatDataEntity statDataEntity = statDataEntities.get(i);
-            parseStatData(packets, statDataEntity, axis);
-        }
+            log.debug("[superSocket]本次查询记录：【{}】条{}", statDataEntities.size(), watch.prettyPrint());
     }
 
     @Override
     public void decode(HashMap <Long, Packet> packets, Set <String> paths, long startTime, long endTime,
                        StatObjType statObjType, StatDataType statDataType, Axis axis) {
+        StopWatch watch = new StopWatch();
+        watch.start("DB 操作");
         List <StatDataEntity> statDataEntities = statDataDao.queryStatDataByPaths(startTime,
                 endTime, paths, statObjType, statDataType);
+        watch.stop();
+        watch.start("数据处理");
+        statDataEntities.stream().forEach(statDataEntity -> parseStatData(packets, statDataEntity, axis));
+        watch.stop();
         if (log.isDebugEnabled())
-            log.debug("本次查询记录：【{}】条", statDataEntities.size());
-        for (int i = 0; i < statDataEntities.size(); i++) {
-            StatDataEntity statDataEntity = statDataEntities.get(i);
-            parseStatData(packets, statDataEntity, axis);
-        }
+            log.debug("[path]本次查询记录：【{}】条{}", statDataEntities.size(), watch.prettyPrint());
     }
 
     /**
@@ -96,11 +101,8 @@ public class StatDataServiceImpl implements IStatDataService {
         if (Objects.isNull(statItemValue)) return;
         List <ProtoDataValue> dataValuesList = statItemValue.getDataValuesList();
         ProtoStatObjKey objKey = statItemValue.getObjKey();
-        for (int i = 0; i < dataValuesList.size(); i++) {
-            ProtoDataValue dataValue = dataValuesList.get(i);
-            parsePacket(packets, objKey, dataValue, statDataEntity, statItemValue.getTimestamp(),
-                    statItemValue.getSubStatInterval(), axis);
-        }
+        dataValuesList.stream().forEach(dataValue -> parsePacket(packets, objKey, dataValue, statDataEntity, statItemValue.getTimestamp(),
+                statItemValue.getSubStatInterval(), axis));
     }
 
     public static final int unit = 64;
@@ -120,8 +122,7 @@ public class StatDataServiceImpl implements IStatDataService {
                             long timestamp, int subStatInterval, Axis axis) {
         if (Objects.isNull(dataValue)) return;
         List <ProtoBitmapValue> bitmapValuesList = dataValue.getBitmapValuesList();
-        for (int i = 0; i < bitmapValuesList.size(); i++) {
-            ProtoBitmapValue bitmapValue = bitmapValuesList.get(i);
+        bitmapValuesList.stream().forEach(bitmapValue -> {
             long index = bitmapValue.getIndex();
             long bitMap = bitmapValue.getBitMap();
             for (int j = 0; j < unit; j++) {
@@ -139,7 +140,7 @@ public class StatDataServiceImpl implements IStatDataService {
                         complementPacket(objKey, dataValue, statDataEntity, timestamp, subStatInterval, packet, axis);
                 }
             }
-        }
+        });
     }
 
     /**

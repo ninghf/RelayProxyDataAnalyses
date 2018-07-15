@@ -50,7 +50,7 @@ public class Axis {
         return roles.get(id);
     }
 
-    private synchronized void createRole(String id) {
+    private void createRole(String id) {
         String superSocketID = id.substring(id.indexOf("-") + 1);
         roles.put(recvPoint + superSocketID, roleId++);
         roles.put(sendPoint + superSocketID, roleId++);
