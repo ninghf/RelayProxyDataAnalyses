@@ -21,9 +21,9 @@ import java.util.Objects;
 public class Proxy extends Base {
 
     private String id;
-    private long sendTime;
-    private long recvTime;
-    private long transTime;
+    private long sendTime = -1;
+    private long recvTime = -1;
+    private long transTime = -1;
 
     @Override
     public boolean equals(Object o) {

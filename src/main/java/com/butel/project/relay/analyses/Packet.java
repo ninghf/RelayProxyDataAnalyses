@@ -251,4 +251,8 @@ public class Packet extends Base implements Comparable<Packet> {
         return count;
     }
 
+    //========================================路径详细处理=========================================
+
+    //每个路径的接包统计，发包统计，路径是否是重复发包路径
+
 }
