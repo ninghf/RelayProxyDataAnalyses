@@ -1,12 +1,7 @@
 package com.butel.project.relay.service;
 
-import com.butel.project.relay.analyses.Axis;
 import com.butel.project.relay.analyses.AnalysesData;
-import com.butel.project.relay.analyses.Packet;
-import com.butel.project.relay.dto.DelayedReq;
-import com.butel.project.relay.dto.LossReq;
-
-import java.util.List;
+import com.butel.project.relay.analyses.OriginalData;
 
 /**
  * @author ninghf
@@ -17,11 +12,6 @@ import java.util.List;
  */
 public interface IAnalysesService {
 
-    AnalysesData generateDelayed(long reqId, DelayedReq req);
-    AnalysesData generateLoss(long reqId, LossReq req);
-
-    List<Packet> getDelayedPackets(long startTime, long endTime, long transTime,
-                                   String superSocketID, boolean isDetail, Axis axis);
-    List<Packet> getLossPackets(long startTime, long endTime, List<Long> packetIds, int limit,
-                                String superSocketID, boolean isDetail, Axis axis);
+    AnalysesData generateAnalysesData(long key, long startTime, long endTime, String superSocketId);
+    OriginalData generateOriginalData(long startTime, long endTime, String superSocketId);
 }

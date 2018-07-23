@@ -1,11 +1,9 @@
 package com.butel.project.relay.dao;
 
-import com.butel.project.relay.constant.StatDataType;
 import com.butel.project.relay.constant.StatObjType;
 import com.butel.project.relay.entity.StatDataEntity;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * @author ninghf
@@ -16,7 +14,5 @@ import java.util.Set;
  */
 public interface IStatDataDao extends IBaseDao {
 
-
-    List<StatDataEntity> queryStatData(long startTime, long endTime, String superSocketID, StatObjType statObjType, StatDataType statDataType);
-    List<StatDataEntity> queryStatDataByPaths(long startTime, long endTime, Set<String> paths, StatObjType statObjType, StatDataType statDataType);
+    List<StatDataEntity> queryStatData(long startTime, long endTime, StatObjType statObjType, String... objIds);
 }

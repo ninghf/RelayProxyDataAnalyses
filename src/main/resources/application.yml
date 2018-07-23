@@ -11,11 +11,13 @@ spring:
     type: caffeine
     caffeine:
       spec: maximumSize=2,expireAfterAccess=1800s
-    cache-names: analyses
+    cache-names: analyses, original
 logging:
   level:
     com.butel.project: debug
   file: D:\logs\relay_proxy.log
+  pattern:
+    file: "%msg%n"
 server:
   port: 8090
   servlet:

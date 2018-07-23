@@ -8,7 +8,7 @@ package com.butel.project.relay.constant;
  * @description TODO
  */
 public enum StatDataType {
-    nul(0), super_socket_send(121), super_socket_recv(122);
+    nul(0), super_socket_send(121), super_socket_recv(122), super_socket_send_repeat(125), super_socket_recv_repeat(123);
 
     private int type;
 

@@ -8,6 +8,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.Random;
 
 /**
  * @author ninghf
@@ -19,7 +20,7 @@ import java.util.List;
 @Slf4j
 @Getter
 @Setter
-public abstract class BaseReqDto {
+public class BaseReqDto {
 
     private long startTime;
     private long endTime;
@@ -40,5 +41,8 @@ public abstract class BaseReqDto {
         currentPage = data.getJSONObject("Pagination").getIntValue("CurrentPage");
     }
 
-    public abstract long getReqId();
+    public long getKey() {
+//        return (superSocketId + startTime + endTime).hashCode();
+        return new Random().nextLong();
+    }
 }

@@ -1,16 +1,18 @@
 package com.butel.project.relay.service.impl;
 
-import com.butel.project.relay.analyses.Axis;
+import com.butel.project.relay.analyses.Base;
+import com.butel.project.relay.analyses.OriginalData;
 import com.butel.project.relay.analyses.Packet;
+import com.butel.project.relay.analyses.Proxy;
 import com.butel.project.relay.constant.StatDataType;
 import com.butel.project.relay.constant.StatObjType;
 import com.butel.project.relay.dao.IStatDataDao;
 import com.butel.project.relay.entity.StatDataEntity;
-import com.butel.project.relay.protobuf.SDNMessage.*;
+import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoDataValue;
+import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoDataValue.ProtoBitmapValue;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoStatObjKey;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoStatObjKey.ProtoStatObj;
-import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoDataValue.ProtoBitmapValue;
 import com.butel.project.relay.service.IStatDataService;
 import com.google.protobuf.InvalidProtocolBufferException;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +20,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
 
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * @author ninghf
@@ -41,49 +44,56 @@ public class StatDataServiceImpl implements IStatDataService {
     }
 
     @Override
-    public void decode(HashMap <Long, Packet> packets, long startTime, long endTime,
-                       String superSocketID, StatObjType statObjType, StatDataType statDataType, Axis axis) {
+    public void decode(OriginalData originalData, long startTime, long endTime, StatObjType statObjType, String... objIds) {
         StopWatch watch = new StopWatch();
         watch.start("DB 操作");
-        List <StatDataEntity> statDataEntities = statDataDao.queryStatData(startTime,
-                endTime, superSocketID, statObjType, statDataType);
+        List <StatDataEntity> statDataEntities = statDataDao.queryStatData(startTime, endTime, statObjType, objIds);
         watch.stop();
         watch.start("数据处理");
-        statDataEntities.stream().forEach(statDataEntity -> parseStatData(packets, statDataEntity, axis));
+        statDataEntities.stream().forEach(statDataEntity -> parseStatData(originalData, statDataEntity));
         watch.stop();
         if (log.isDebugEnabled())
-            log.debug("[superSocket]本次查询记录：【{}】条{}", statDataEntities.size(), watch.prettyPrint());
+            log.debug("[decode]【{}】条数据耗时{}", statDataEntities.size(), watch.prettyPrint());
     }
 
-    @Override
-    public void decode(HashMap <Long, Packet> packets, Set <String> paths, long startTime, long endTime,
-                       StatObjType statObjType, StatDataType statDataType, Axis axis) {
-        StopWatch watch = new StopWatch();
-        watch.start("DB 操作");
-        List <StatDataEntity> statDataEntities = statDataDao.queryStatDataByPaths(startTime,
-                endTime, paths, statObjType, statDataType);
-        watch.stop();
-        watch.start("数据处理");
-        statDataEntities.stream().forEach(statDataEntity -> parseStatData(packets, statDataEntity, axis));
-        watch.stop();
-        if (log.isDebugEnabled())
-            log.debug("[path]本次查询记录：【{}】条{}", statDataEntities.size(), watch.prettyPrint());
+    public boolean isRepeat(StatDataEntity statDataEntity) {
+        if (statDataEntity.getStatType() == StatDataType.super_socket_send_repeat.getType()
+                || statDataEntity.getStatType() == StatDataType.super_socket_recv_repeat.getType())
+            return true;
+        return false;
+    }
+
+    public boolean isSuperSocket(StatDataEntity statDataEntity) {
+        return statDataEntity.getObjType() == StatObjType.super_socket.getType();
+    }
+
+    public boolean isSender(StatDataEntity statDataEntity) {
+        return statDataEntity.getStatType() == StatDataType.super_socket_send.getType() ||
+                statDataEntity.getStatType() == StatDataType.super_socket_send_repeat.getType();
+    }
+
+    public boolean isRecver(StatDataEntity statDataEntity) {
+        return statDataEntity.getStatType() == StatDataType.super_socket_recv.getType() ||
+                statDataEntity.getStatType() == StatDataType.super_socket_recv_repeat.getType();
+    }
+
+    public boolean isProxy(StatDataEntity statDataEntity) {
+        return statDataEntity.getObjType() == StatObjType.path.getType();
     }
 
     /**
      * 解析protobuf(StatDataEntity)->ProtoStatItemValue
-     * @param packets
+     * @param originalData
      * @param statDataEntity
-     * @param axis
      */
-    public void parseStatData(HashMap <Long, Packet> packets, StatDataEntity statDataEntity, Axis axis) {
+    public void parseStatData(OriginalData originalData, StatDataEntity statDataEntity) {
         if (Objects.isNull(statDataEntity)) return;
         byte[] data = statDataEntity.getItemValue().getData();
         if (data.length == 0) return;
         try {
             ProtoStatItemValue statItemValue = ProtoStatItemValue.parseFrom(data);
-            parseDataValue(packets, statItemValue, statDataEntity, axis);
-
+            if (Objects.nonNull(statItemValue))
+                parseDataValue(originalData, statItemValue, statDataEntity);
         } catch (InvalidProtocolBufferException e) {
             log.error("解析【统计数据包】异常：", e);
         }
@@ -91,18 +101,16 @@ public class StatDataServiceImpl implements IStatDataService {
 
     /**
      * 解析 DataValue
-     * @param packets
+     * @param originalData
      * @param statItemValue
      * @param statDataEntity
-     * @param axis
      */
-    public void parseDataValue(HashMap <Long, Packet> packets, ProtoStatItemValue statItemValue,
-                               StatDataEntity statDataEntity, Axis axis) {
+    public void parseDataValue(OriginalData originalData, ProtoStatItemValue statItemValue, StatDataEntity statDataEntity) {
         if (Objects.isNull(statItemValue)) return;
         List <ProtoDataValue> dataValuesList = statItemValue.getDataValuesList();
         ProtoStatObjKey objKey = statItemValue.getObjKey();
-        dataValuesList.stream().forEach(dataValue -> parsePacket(packets, objKey, dataValue, statDataEntity, statItemValue.getTimestamp(),
-                statItemValue.getSubStatInterval(), axis));
+        dataValuesList.parallelStream().filter(dataValue -> Objects.nonNull(dataValue)).forEach(dataValue -> parsePacket(originalData, objKey, dataValue, statDataEntity, statItemValue.getTimestamp(),
+                statItemValue.getSubStatInterval()));
     }
 
     public static final int unit = 64;
@@ -110,89 +118,95 @@ public class StatDataServiceImpl implements IStatDataService {
 
     /**
      * 解析bitmap并封装packet
-     * @param packets
+     * @param originalData
      * @param objKey
      * @param dataValue
      * @param statDataEntity
      * @param timestamp
      * @param subStatInterval
-     * @param axis
      */
-    public void parsePacket(HashMap <Long, Packet> packets, ProtoStatObjKey objKey, ProtoDataValue dataValue, StatDataEntity statDataEntity,
-                            long timestamp, int subStatInterval, Axis axis) {
+    public void parsePacket(OriginalData originalData, ProtoStatObjKey objKey, ProtoDataValue dataValue, StatDataEntity statDataEntity,
+                            long timestamp, int subStatInterval) {
         if (Objects.isNull(dataValue)) return;
         List <ProtoBitmapValue> bitmapValuesList = dataValue.getBitmapValuesList();
-        bitmapValuesList.stream().forEach(bitmapValue -> {
+        bitmapValuesList.parallelStream().forEach(bitmapValue -> {
             long index = bitmapValue.getIndex();
             long bitMap = bitmapValue.getBitMap();
             for (int j = 0; j < unit; j++) {
                 if ((bitMap & (bit << j)) != 0) {
                     long packetID = index * unit + j;
-                    Packet packet;
-                    if (!packets.containsKey(packetID)) {
-                        packet = new Packet();
-                        packet.setPacketID(packetID);
-                        packets.put(packetID, packet);
-                    } else {
-                        packet = packets.get(packetID);
-                    }
+                    Packet packet = originalData.getPacket(packetID, isRepeat(statDataEntity), statDataEntity.getTimestamp());
                     if (Objects.nonNull(packet))
-                        complementPacket(objKey, dataValue, statDataEntity, timestamp, subStatInterval, packet, axis);
+                        complementPacket(originalData, objKey, dataValue, statDataEntity, timestamp, subStatInterval, packet);
                 }
             }
         });
     }
 
     /**
-     * 完成packet的发送时间(sendTime)和接收时间(recvTime)
+     * 赋值superSocketID和收集Paths
+     * @param originalData
      * @param objKey
      * @param dataValue
      * @param statDataEntity
      * @param timestamp
      * @param subStatInterval
      * @param packet
-     * @param axis
      */
-    public void complementPacket(ProtoStatObjKey objKey, ProtoDataValue dataValue, StatDataEntity statDataEntity, long timestamp,
-                                 int subStatInterval, Packet packet, Axis axis) {
-        if (statDataEntity.getStatType() == StatDataType.super_socket_send.getType()) {
-            long sendTime = timestamp + subStatInterval * dataValue.getIndex();
-            String sendSuperSocketID = statDataEntity.getObjID();
-            packet.setSendTime(sendTime);
-            packet.setSendSuperSocketID(sendSuperSocketID);
-            packet.setTimestampSend(timestamp);
-            packet.setIdxSend(dataValue.getIndex());
-            packet.setYAxisSend(axis.getRoleId("[send]-[" + sendSuperSocketID + "]"));
-        } else if (statDataEntity.getStatType() == StatDataType.super_socket_recv.getType()) {
-            long recvTime = timestamp + subStatInterval * dataValue.getIndex();
-            String recvSuperSocketID = statDataEntity.getObjID();
-            packet.setRecvTime(recvTime);
-            packet.setRecvSuperSocketID(recvSuperSocketID);
-            packet.setTimestampRecv(timestamp);
-            packet.setIdxRecv(dataValue.getIndex());
-            packet.setYAxisRecv(axis.getRoleId("[recv]-[" + recvSuperSocketID + "]"));
+    public void complementPacket(OriginalData originalData, ProtoStatObjKey objKey, ProtoDataValue dataValue, StatDataEntity statDataEntity, long timestamp,
+                                 int subStatInterval, Packet packet) {
+        if (isSuperSocket(statDataEntity)) {
+            packet.setSuperSocketID(statDataEntity.getObjID());
+            if (objKey.getAssociatesCount() == 0) return;
+            List <ProtoStatObj> associatesList = objKey.getAssociatesList();
+            associatesList.parallelStream().filter(statObj -> statObj.getObjType() == StatObjType.path.getType())
+                    .forEach(statObj -> {
+                        String pathId = statObj.getObjId();
+                        packet.addProxy(pathId);
+                        originalData.addPath(pathId, isRepeat(statDataEntity));// 收集Paths
+                    });
+            complementTime(packet, dataValue, statDataEntity, timestamp, subStatInterval);
+        } else if (isProxy(statDataEntity)) {
+            String pathId = statDataEntity.getObjID();
+            if (!packet.isExistProxy(pathId)) {
+                packet.addProxy(pathId);
+            }
+            Proxy proxy = packet.getProxy(pathId);
+            complementTime(proxy, dataValue, statDataEntity, timestamp, subStatInterval);
         }
-        complementPath(statDataEntity, objKey, packet);
     }
 
     /**
-     * 完成packet的路径信息(path)
+     * 完成packet的发送时间(sendTime)和接收时间(recvTime)
+     * @param base
+     * @param dataValue
      * @param statDataEntity
-     * @param objKey
-     * @param packet
+     * @param timestamp
+     * @param subStatInterval
      */
-    public void complementPath(StatDataEntity statDataEntity, ProtoStatObjKey objKey, Packet packet) {
-        if (statDataEntity.getObjType() == StatObjType.super_socket.getType()) {
-            if (objKey.getAssociatesCount() == 0) return;
-            List <ProtoStatObj> associatesList = objKey.getAssociatesList();
-            for (int i = 0; i < associatesList.size(); i++) {
-                ProtoStatObj statObj = associatesList.get(i);
-                if (statObj.getObjType() == StatObjType.path.getType()) {
-                    packet.addPathID(statObj.getObjId());
-                }
+    public void complementTime(Base base, ProtoDataValue dataValue, StatDataEntity statDataEntity, long timestamp,
+                               int subStatInterval) {
+        long time = timestamp + subStatInterval * dataValue.getIndex();
+        if (isSender(statDataEntity)) {
+            if (base instanceof Packet) {
+                Packet packet = (Packet) base;
+                packet.setSendTime(time);
+            } else if (base instanceof Proxy) {
+                Proxy proxy = (Proxy) base;
+                proxy.setSendTime(time);
             }
-        } else if (statDataEntity.getObjType() == StatObjType.path.getType()) {
-            packet.addPathID(statDataEntity.getObjID());
+            base.setTimestampSend(timestamp);
+            base.setIdxSend(dataValue.getIndex());
+        } else if (isRecver(statDataEntity)) {
+            if (base instanceof Packet) {
+                Packet packet = (Packet) base;
+                packet.setRecvTime(time);
+            } else if (base instanceof Proxy) {
+                Proxy proxy = (Proxy) base;
+                proxy.setRecvTime(time);
+            }
+            base.setTimestampRecv(timestamp);
+            base.setIdxRecv(dataValue.getIndex());
         }
     }
 }

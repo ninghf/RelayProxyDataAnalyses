@@ -7,11 +7,8 @@ import com.butel.project.relay.entity.StatDataEntity;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
-import org.springframework.util.StringUtils;
 
 import java.util.List;
-import java.util.Objects;
-import java.util.Set;
 
 /**
  * @author ninghf
@@ -25,25 +22,16 @@ public class StatDataDaoImpl extends BaseDaoImpl implements IStatDataDao {
 
     public static final String collectionName = "stat_data";
 
-    @Override
-    public List<StatDataEntity> queryStatData(long startTime, long endTime, String superSocketID, StatObjType statObjType, StatDataType statDataType) {
-        Query query = new Query();
-        query.addCriteria(Criteria.where("timestamp").gte(startTime).lte(endTime));
-        if (!StringUtils.isEmpty(superSocketID))
-            query.addCriteria(Criteria.where("objID").is(superSocketID));
-        query.addCriteria(Criteria.where("objType").is(statObjType.getType()));
-        query.addCriteria(Criteria.where("statType").is(statDataType.getType()));
-        return find(query, StatDataEntity.class, collectionName);
-    }
 
     @Override
-    public List <StatDataEntity> queryStatDataByPaths(long startTime, long endTime, Set<String> paths,
-                                                      StatObjType statObjType, StatDataType statDataType) {
+    public List <StatDataEntity> queryStatData(long startTime, long endTime, StatObjType statObjType, String... objIds) {
         Query query = new Query();
         query.addCriteria(Criteria.where("timestamp").gte(startTime).lte(endTime));
-        query.addCriteria(Criteria.where("objID").in(paths));
+        query.addCriteria(Criteria.where("objID").in(objIds));
         query.addCriteria(Criteria.where("objType").is(statObjType.getType()));
-        query.addCriteria(Criteria.where("statType").is(statDataType.getType()));
+        query.addCriteria(Criteria.where("statType").in(
+                StatDataType.super_socket_send.getType(), StatDataType.super_socket_recv.getType(),
+                StatDataType.super_socket_send_repeat.getType(), StatDataType.super_socket_recv_repeat.getType()));
         return find(query, StatDataEntity.class, collectionName);
     }
 }

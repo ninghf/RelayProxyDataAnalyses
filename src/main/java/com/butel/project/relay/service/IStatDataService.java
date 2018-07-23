@@ -1,12 +1,7 @@
 package com.butel.project.relay.service;
 
-import com.butel.project.relay.analyses.Axis;
-import com.butel.project.relay.analyses.Packet;
-import com.butel.project.relay.constant.StatDataType;
+import com.butel.project.relay.analyses.OriginalData;
 import com.butel.project.relay.constant.StatObjType;
-
-import java.util.HashMap;
-import java.util.Set;
 
 /**
  * @author ninghf
@@ -21,25 +16,11 @@ public interface IStatDataService {
 
     /**
      * 解析MongoDB存储的Protobuf数据结构
-     * @param packets
-     * @param startTime
-     * @param endTime
-     * @param superSocketID
-     * @param statObjType
-     * @param statDataType
-     */
-    void decode(HashMap <Long, Packet> packets, long startTime, long endTime,
-                String superSocketID, StatObjType statObjType, StatDataType statDataType, Axis axis);
-
-    /**
-     * 解析MongoDB存储的Protobuf数据结构
-     * @param packets
-     * @param paths
+     * @param originalData
      * @param startTime
      * @param endTime
      * @param statObjType
-     * @param statDataType
+     * @param objIds
      */
-    void decode(HashMap <Long, Packet> packets, Set<String> paths, long startTime, long endTime,
-                StatObjType statObjType, StatDataType statDataType, Axis axis);
+    void decode(OriginalData originalData, long startTime, long endTime, StatObjType statObjType, String... objIds);
 }

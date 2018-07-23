@@ -2,17 +2,15 @@ package com.butel.project.relay.controller;
 
 import com.alibaba.fastjson.JSONObject;
 import com.butel.project.relay.analyses.AnalysesData;
-import com.butel.project.relay.analyses.Packet;
-import com.butel.project.relay.dto.DelayedDataDto;
-import com.butel.project.relay.dto.DelayedReq;
-import com.butel.project.relay.dto.LossReq;
+import com.butel.project.relay.dto.BaseReqDto;
+import com.butel.project.relay.dto.Summary;
 import com.butel.project.relay.service.IAnalysesService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.util.Objects;
 
 /**
  * @author ninghf
@@ -28,33 +26,31 @@ public class StatDataController {
     @Autowired
     private IAnalysesService service;
 
-    @RequestMapping(method = RequestMethod.POST, path = "/delayed")
+    @RequestMapping(method = RequestMethod.POST, path = "/summary")
     @CrossOrigin()
-    public DelayedDataDto getDelayedData(@RequestBody JSONObject json) {
+    public Summary getSummaryData(@RequestBody JSONObject json) {
         StopWatch watch = new StopWatch();
         watch.start("解析请求数据");
-        DelayedReq req = new DelayedReq();
-        req.decode(json);
+        BaseReqDto req = new BaseReqDto();
+        req.decode(json.getJSONObject("data"));
         watch.stop();
         watch.start("计算");
-        AnalysesData analysesData = service.generateDelayed(req.getReqId(), req);
-        List <Packet> vPackets = analysesData.getPackets();
+        AnalysesData analysesData = service.generateAnalysesData(req.getKey(), req.getStartTime(), req.getEndTime(), req.getSuperSocketId());
+        if (Objects.isNull(analysesData))
+            return null;
         watch.stop();
         watch.start("包装响应数据");
-        DelayedDataDto delayedDataDto = DelayedDataDto.createInstance(vPackets, analysesData.getAxis(), req.isDetail(), req.getLimit(), req.getCurrentPage());
+        Summary summary = new Summary();
+        summary.toSummary(analysesData);
         watch.stop();
-        log.info("总数据包数:{}个,{},耗时打印{}", Objects.nonNull(vPackets) ? vPackets.size() : 0, analysesData.getAxis(), watch.prettyPrint());
-        return delayedDataDto;
+        summary.setTime(watch.getTotalTimeMillis());
+        log.info("耗时打印{}", watch.prettyPrint());
+        return summary;
     }
 
-    @RequestMapping(method = RequestMethod.POST, path = "/loss")
+    @RequestMapping(method = RequestMethod.POST, path = "/detail")
     @CrossOrigin()
-    public DelayedDataDto getLossData(@RequestBody JSONObject json) {
-        LossReq req = new LossReq();
-        req.decode(json);
-        AnalysesData analysesData = service.generateLoss(req.getReqId(), req);
-        List <Packet> vPackets = analysesData.getPackets();
-        log.info("总数据包数:{}个,{}", Objects.nonNull(vPackets) ? vPackets.size() : 0, analysesData.getAxis());
-        return DelayedDataDto.createInstance(vPackets, analysesData.getAxis(), req.isDetail(), req.getLimit(), req.getCurrentPage());
+    public void getDetailData(@RequestBody JSONObject json) {
+
     }
 }
