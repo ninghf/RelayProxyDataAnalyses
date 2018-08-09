@@ -26,26 +26,45 @@ public class Summary extends BaseRespDto {
 
     private List<Table> tables;
     private List<Option> options;
+    private Map<Long, List<String>> zoom;
 
     public void toSummary(AnalysesData analysesData) {
+        if (Objects.nonNull(analysesData.getTransTimeDistributionDetail()))
+            zoom = analysesData.getTransTimeDistributionDetail();
         if (Objects.isNull(tables))
             tables = new LinkedList <>();
         Table table = new Table();
         List<Item> items = new LinkedList <>();
-        items.add(new Item("理论", analysesData.getPacketTotal(), analysesData.getPacketTotal()));
-        items.add(new Item("实际", analysesData.getSenderTotal(), analysesData.getRecverTotal()));
-        items.add(new Item("原始丢包", analysesData.getLossSenderTotal(), analysesData.getLossRecverTotal()));
-        items.add(new Item("纠错后丢包", analysesData.getFecLossSenderTotal(), analysesData.getFecLossRecverTotal()));
-        items.add(new Item("重复包", analysesData.getRepeatSendPacketTotal(), analysesData.getRepeatRecvPacketTotal()));
+        items.add(new Item("端到端").builder(
+                analysesData.getSendTotal(), analysesData.getRecvTotal(),
+                analysesData.getNonRepeatSendTotal(), analysesData.getNonRepeatRecvTotal(),
+                analysesData.getLossRate(), analysesData.getFecLossRate(), analysesData.getFecRate(),
+                analysesData.getRepeatSpendRate(), analysesData.getRepeatWasteRate()));
         table.setItems(items);
         tables.add(table);
 
         if (Objects.isNull(options))
             options = new LinkedList <>();
-        options.add(Option.createOption("延时分布", analysesData.getTransTimeDistribution()));
+        // 数据包落点追踪
+        options.add(Option.createOption(analysesData.getPacketList(), analysesData.getAgents()));
+        options.add(Option.createOption("端到端延时分布", analysesData.getTransTimeDistribution()));
         options.add(Option.createOption("首次延时分布", analysesData.getOnceTransTimeDistribution()));
         options.add(Option.createOption("重复延时分布", analysesData.getRepeatTransTimeDistribution()));
-        options.add(Option.createOption("成功发送次数分布", analysesData.getRepeatSuccessDistribution()));
-        options.add(Option.createOption("失败发送次数分布", analysesData.getRepeatFailureDistribution()));
+        options.add(Option.createOption("成功发送次数分布", analysesData.getSendSuccessDistribution()));
+        options.add(Option.createOption("失败发送次数分布", analysesData.getSendFailureDistribution()));
+        options.add(Option.createOption("重复成功发送次数分布", analysesData.getRepeatSuccessDistribution()));
+        options.add(Option.createOption("重复失败发送次数分布", analysesData.getRepeatFailureDistribution()));
+        List <AnalysesData.Agent> agents = analysesData.getAgents();
+        if (Objects.nonNull(agents)) {
+            int agentIdx = 1;
+            for (int i = 0; i < agents.size(); i++) {
+                AnalysesData.Agent agent = agents.get(i);
+                items.add(new Item("Client->Agent" + agentIdx).builder(agent.getSendToAgentCount(), agent.getRecvFromClientCount(), agent.getPathId()));
+                items.add(new Item("Agent" + agentIdx + "中转").builder(agent.getRecvFromClientCount(), agent.getSendToRelayCount(), agent.getPathId()));
+                items.add(new Item("Agent" + agentIdx + "->Relay").builder(agent.getSendToRelayCount(), agent.getRecvFromAgentCount(), agent.getPathId()));
+                options.add(Option.createOption("Agent" + agentIdx + "延时分布", "pathId:" + agent.getPathId(), agent.getTransTimeOnAgent()));
+                agentIdx++;
+            }
+        }
     }
 }

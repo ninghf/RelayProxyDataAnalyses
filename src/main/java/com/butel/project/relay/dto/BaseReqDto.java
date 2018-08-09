@@ -26,7 +26,7 @@ public class BaseReqDto {
     private long endTime;
 
     private String superSocketId;
-    private boolean detail;
+    private int transTime;
     private int limit;
     private int currentPage;
 
@@ -35,7 +35,7 @@ public class BaseReqDto {
         endTime = data.getLongValue("EndTime");
 
         superSocketId = data.getString("SuperSocketID").trim();
-        detail = data.getBoolean("IsDetail");
+        transTime = data.getIntValue("TransTime");
 
         limit = data.getIntValue("Limit");
         currentPage = data.getJSONObject("Pagination").getIntValue("CurrentPage");

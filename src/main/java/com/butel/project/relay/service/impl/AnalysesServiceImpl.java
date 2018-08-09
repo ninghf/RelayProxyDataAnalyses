@@ -31,12 +31,12 @@ public class AnalysesServiceImpl implements IAnalysesService {
 
     @Override
 //    @Cacheable(value = "analyses")
-    public AnalysesData generateAnalysesData(long key, long startTime, long endTime, String superSocketId) {
+    public AnalysesData generateAnalysesData(long key, long startTime, long endTime, int transTime, String superSocketId) {
         OriginalData originalData = generateOriginalData(startTime, endTime, superSocketId);
         if (Objects.isNull(originalData))
             return null;
         AnalysesData analysesData = new AnalysesData();
-        analysesData.processOriginalData(originalData);
+        analysesData.processOriginalData(originalData, transTime);
         if (log.isDebugEnabled())
             log.debug("生成分析数据：{}", analysesData);
         return analysesData;

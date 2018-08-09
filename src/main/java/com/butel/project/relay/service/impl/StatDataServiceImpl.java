@@ -135,6 +135,7 @@ public class StatDataServiceImpl implements IStatDataService {
             for (int j = 0; j < unit; j++) {
                 if ((bitMap & (bit << j)) != 0) {
                     long packetID = index * unit + j;
+                    // 如何是路径信息数据，只能取出原始数据包，不能判断是否是重复发包
                     Packet packet = originalData.getPacket(packetID, isRepeat(statDataEntity), statDataEntity.getTimestamp());
                     if (Objects.nonNull(packet))
                         complementPacket(originalData, objKey, dataValue, statDataEntity, timestamp, subStatInterval, packet);
@@ -162,17 +163,20 @@ public class StatDataServiceImpl implements IStatDataService {
             associatesList.parallelStream().filter(statObj -> statObj.getObjType() == StatObjType.path.getType())
                     .forEach(statObj -> {
                         String pathId = statObj.getObjId();
-                        packet.addProxy(pathId);
+                        if (isSender(statDataEntity))
+                            packet.setSenderPathId(pathId);
+                        if (isRecver(statDataEntity))
+                            packet.setRecverPathId(pathId);
                         originalData.addPath(pathId, isRepeat(statDataEntity));// 收集Paths
                     });
             complementTime(packet, dataValue, statDataEntity, timestamp, subStatInterval);
         } else if (isProxy(statDataEntity)) {
             String pathId = statDataEntity.getObjID();
-            if (!packet.isExistProxy(pathId)) {
-                packet.addProxy(pathId);
-            }
-            Proxy proxy = packet.getProxy(pathId);
+            Proxy proxy = new Proxy();
+            proxy.setId(pathId);
+            proxy.setTimestamp(statDataEntity.getTimestamp());
             complementTime(proxy, dataValue, statDataEntity, timestamp, subStatInterval);
+            packet.addProxy(proxy);
         }
     }
 

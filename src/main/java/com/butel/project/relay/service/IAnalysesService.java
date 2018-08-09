@@ -12,6 +12,6 @@ import com.butel.project.relay.analyses.OriginalData;
  */
 public interface IAnalysesService {
 
-    AnalysesData generateAnalysesData(long key, long startTime, long endTime, String superSocketId);
+    AnalysesData generateAnalysesData(long key, long startTime, long endTime, int transTime, String superSocketId);
     OriginalData generateOriginalData(long startTime, long endTime, String superSocketId);
 }

@@ -23,4 +23,11 @@ public class Base {
     protected long timestampRecv;
     protected int idxSend;
     protected int idxRecv;
+
+    // 数值有效性校验
+    protected boolean isValid(long value) {
+        if (value != -1)
+            return true;
+        return false;
+    }
 }

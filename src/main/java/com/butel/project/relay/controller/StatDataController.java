@@ -35,7 +35,7 @@ public class StatDataController {
         req.decode(json.getJSONObject("data"));
         watch.stop();
         watch.start("计算");
-        AnalysesData analysesData = service.generateAnalysesData(req.getKey(), req.getStartTime(), req.getEndTime(), req.getSuperSocketId());
+        AnalysesData analysesData = service.generateAnalysesData(req.getKey(), req.getStartTime(), req.getEndTime(), req.getTransTime(), req.getSuperSocketId());
         if (Objects.isNull(analysesData))
             return null;
         watch.stop();

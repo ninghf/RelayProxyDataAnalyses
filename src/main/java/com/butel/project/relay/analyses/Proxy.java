@@ -25,17 +25,40 @@ public class Proxy extends Base {
     private long recvTime = -1;
     private long transTime = -1;
 
+    private long timestamp;
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Proxy proxy = (Proxy) o;
-        return Objects.equals(id, proxy.id);
+        return sendTime == proxy.sendTime &&
+                recvTime == proxy.recvTime &&
+                timestamp == proxy.timestamp &&
+                Objects.equals(id, proxy.id);
     }
 
     @Override
     public int hashCode() {
 
-        return Objects.hash(id);
+        return Objects.hash(id, sendTime, recvTime, timestamp);
+    }
+
+    public boolean isValidSend() {
+        if (isValid(sendTime)) return true;
+        return false;
+    }
+
+    public boolean isValidRecv() {
+        if (isValid(recvTime)) return true;
+        return false;
+    }
+
+    public long getRecvTimeDifference(long sendTime) {
+        return Math.abs(recvTime - sendTime);
+    }
+
+    public long getSendTimeDifference(long recvTime) {
+        return Math.abs(recvTime - sendTime);
     }
 }

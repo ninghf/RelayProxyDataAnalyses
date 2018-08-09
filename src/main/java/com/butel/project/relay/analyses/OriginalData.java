@@ -81,29 +81,6 @@ public class OriginalData {
                 .collect(Collectors.toList());
         if (packetList.isEmpty())
             return null;
-        // 补充丢失的数据包
-        List<Packet> lossPackets = new LinkedList <>();
-        long min_packetId = packetList.get(0).getPacketID();
-        for (int i = 0; i < packetList.size(); i++) {
-            Packet packet = packetList.get(i);
-            if (min_packetId != packet.getPacketID()) {
-                Packet lossPacket = new Packet();
-                lossPacket.setPacketID(min_packetId);
-//                lossPacket.doCheckSequence(i);
-                lossPackets.add(lossPacket);
-            }
-            min_packetId++;
-//            packet.doCheckSequence(i);
-        }
-        if (log.isDebugEnabled())
-            log.debug("丢包列表：{}", lossPackets);
-        if (!lossPackets.isEmpty())
-            packetList.addAll(lossPackets);
-//        Map <Long, Long> checks = packetList.stream()
-//                .collect(Collectors.groupingBy(Packet::getCheck, Collectors.counting()));
-//        if (log.isDebugEnabled())
-//            log.debug("丢包分布{}", checks);
-
         return packetList;
     }
 }

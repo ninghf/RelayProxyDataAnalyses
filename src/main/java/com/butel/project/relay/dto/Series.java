@@ -1,6 +1,5 @@
 package com.butel.project.relay.dto;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.annotation.JSONType;
 import com.alibaba.fastjson.parser.Feature;
 import com.alibaba.fastjson.serializer.SerializerFeature;
@@ -11,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -27,6 +27,7 @@ import java.util.Objects;
 public class Series {
 
     private final String type;
+    private String color = "#4B45C0";
     private List<Data> data;
 
     public Series(String type) {
@@ -38,30 +39,37 @@ public class Series {
             throw new IllegalArgumentException("this is pie");
         if (Objects.isNull(data))
             data = new LinkedList <>();
-        data.add(new PieData(value, name));
+        data.add(new PieData(value, name, null));
     }
 
-    public void addLineData(int x, int y) {
+    public void addLineData(int x, int y, Map<String, String> extras) {
         if (!type.equals("line"))
             throw new IllegalArgumentException("this is line");
+        if (extras.get("repeat").equals("true"))
+            color = "#FF0000";
         if (Objects.isNull(data))
             data = new LinkedList <>();
-        data.add(new LineData(x, y));
+        data.add(new LineData(x, y, extras));
     }
 
     @Getter
     @Setter
     class Data {
+        protected Map<String, String> extras;
 
+        public Data(Map <String, String> extras) {
+            this.extras = extras;
+        }
     }
 
     @Getter
     @Setter
     class PieData extends Data {
-        int value;
+        int y;
         String name;
-        public PieData(int value, String name) {
-            this.value = value;
+        public PieData(int value, String name, Map<String, String> extras) {
+            super(extras);
+            this.y = value;
             this.name = name;
         }
     }
@@ -73,18 +81,10 @@ public class Series {
         int x;
         int y;
 
-        public LineData(int x, int y) {
+        public LineData(int x, int y, Map<String, String> extras) {
+            super(extras);
             this.x = x;
             this.y = y;
         }
-    }
-
-    public static void main(String[] args) {
-        Series series = new Series("line");
-        for (int i = 0; i < 5; i++) {
-            series.addLineData(i, i+1);
-        }
-
-        log.debug("{}", JSON.toJSONString(series));
     }
 }
