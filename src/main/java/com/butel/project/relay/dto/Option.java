@@ -60,9 +60,6 @@ public class Option {
 
             } else {// 重复发包
                 // 首次发包路径
-                if (packet.getPacketID() == 200) {
-                    log.debug("{}", packet);
-                }
                 if (packet.isOnceSend()) {
                     Series series = new Series("line");
                     completeSeries(packet, packet.getExtras(false), axis, series, packet);

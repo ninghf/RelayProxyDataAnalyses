@@ -30,6 +30,7 @@ public class AnalysesData {
     private long nonRepeatSendTotal;
     private long nonRepeatRecvTotal;
     private double lossRate;
+    private double sendRate;
     private double fecLossRate;
     private double fecRate;
     private double repeatSpendRate;
@@ -65,6 +66,11 @@ public class AnalysesData {
                 .filter(Packet::isOnceRecv).count();
         // 原始丢包率=（1 – 实际收包/实际发包）*100
         lossRate = keepFourDecimalPlaces(1 - (double)recvTotal/sendTotal) * 100;
+        // 发送丢包率=（1 - 业务发包/应发包）*100
+        long max = packetList.parallelStream().max(Packet::compareTo).get().getPacketID();
+        long min = packetList.parallelStream().min(Packet::compareTo).get().getPacketID();
+        long perfectSendTotal = max - min + 1;
+        sendRate = keepFourDecimalPlaces(1 - (double)nonRepeatSendTotal/perfectSendTotal) * 100;
         // 纠错后丢包率=（1 - 业务收包（在超时时间范围内）/业务发包）*100
         long validNonRepeatRecvTotal = packetList.parallelStream()
                 .filter(packet -> packet.isValidRecv(checkTransTime)).count();

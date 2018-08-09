@@ -25,6 +25,7 @@ public class Item {
     private String total;
     private String nonRepeatTotal;
     private String lossRate;
+    private String sendRate;
     private String fecLossRate;
     private String fecRate;
     private String repeatSpendRate;
@@ -47,6 +48,11 @@ public class Item {
 
     public Item lossRate(double lossRate) {
         this.lossRate = toStr(lossRate);
+        return this;
+    }
+
+    public Item sendRate(double sendRate) {
+        this.sendRate = toStr(sendRate);
         return this;
     }
 
@@ -81,10 +87,11 @@ public class Item {
         return this;
     }
 
-    public Item builder(long sendTotal, long recvTotal, long nonRepeatSendTotal, long nonRepeatRecvTotal, double lossRate, double fecLossRate, double fecRate, double repeatSpendRate, double repeatWasteRate) {
+    public Item builder(long sendTotal, long recvTotal, long nonRepeatSendTotal, long nonRepeatRecvTotal, double lossRate, double sendRate, double fecLossRate, double fecRate, double repeatSpendRate, double repeatWasteRate) {
         total(sendTotal, recvTotal);
         nonRepeatTotal(nonRepeatSendTotal, nonRepeatRecvTotal);
         lossRate(lossRate);
+        sendRate(sendRate);
         fecLossRate(fecLossRate);
         fecRate(fecRate);
         repeatSpendRate(repeatSpendRate);

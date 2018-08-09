@@ -38,7 +38,7 @@ public class Summary extends BaseRespDto {
         items.add(new Item("端到端").builder(
                 analysesData.getSendTotal(), analysesData.getRecvTotal(),
                 analysesData.getNonRepeatSendTotal(), analysesData.getNonRepeatRecvTotal(),
-                analysesData.getLossRate(), analysesData.getFecLossRate(), analysesData.getFecRate(),
+                analysesData.getLossRate(), analysesData.getSendRate(), analysesData.getFecLossRate(), analysesData.getFecRate(),
                 analysesData.getRepeatSpendRate(), analysesData.getRepeatWasteRate()));
         table.setItems(items);
         tables.add(table);

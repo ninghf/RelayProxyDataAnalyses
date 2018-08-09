@@ -37,8 +37,8 @@ public class AnalysesServiceImpl implements IAnalysesService {
             return null;
         AnalysesData analysesData = new AnalysesData();
         analysesData.processOriginalData(originalData, transTime);
-        if (log.isDebugEnabled())
-            log.debug("生成分析数据：{}", analysesData);
+//        if (log.isDebugEnabled())
+//            log.debug("生成分析数据：{}", analysesData);
         return analysesData;
     }
 
