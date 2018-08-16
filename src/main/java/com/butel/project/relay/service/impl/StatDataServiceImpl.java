@@ -8,11 +8,13 @@ import com.butel.project.relay.constant.StatDataType;
 import com.butel.project.relay.constant.StatObjType;
 import com.butel.project.relay.dao.IStatDataDao;
 import com.butel.project.relay.entity.StatDataEntity;
+import com.butel.project.relay.entity.StatObjKey;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoDataValue;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoDataValue.ProtoBitmapValue;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoStatObjKey;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoStatObjKey.ProtoStatObj;
+import com.butel.project.relay.repository.StatDataRepository;
 import com.butel.project.relay.service.IStatDataService;
 import com.google.protobuf.InvalidProtocolBufferException;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import org.springframework.util.StopWatch;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * @author ninghf
@@ -36,6 +39,8 @@ public class StatDataServiceImpl implements IStatDataService {
 
     @Autowired
     private IStatDataDao statDataDao;
+    @Autowired
+    private StatDataRepository repository;
 
 
     @Override
@@ -50,35 +55,36 @@ public class StatDataServiceImpl implements IStatDataService {
         List <StatDataEntity> statDataEntities = statDataDao.queryStatData(startTime, endTime, statObjType, objIds);
         watch.stop();
         watch.start("数据处理");
-        statDataEntities.stream().forEach(statDataEntity -> parseStatData(originalData, statDataEntity));
+        statDataEntities.forEach(statDataEntity -> parseStatData(originalData, statDataEntity));
         watch.stop();
         if (log.isDebugEnabled())
             log.debug("[decode]【{}】条数据耗时{}", statDataEntities.size(), watch.prettyPrint());
     }
 
     public boolean isRepeat(StatDataEntity statDataEntity) {
-        if (statDataEntity.getStatType() == StatDataType.super_socket_send_repeat.getType()
-                || statDataEntity.getStatType() == StatDataType.super_socket_recv_repeat.getType())
+        if (statDataEntity.getStatObjKey().getStatType() == StatDataType.super_socket_send_repeat.getType()
+                || statDataEntity.getStatObjKey().getStatType() == StatDataType.super_socket_recv_repeat.getType())
             return true;
         return false;
     }
 
     public boolean isSuperSocket(StatDataEntity statDataEntity) {
-        return statDataEntity.getObjType() == StatObjType.super_socket.getType();
+        return statDataEntity.getStatObjKey().getStatType() == StatObjType.super_socket.getType();
     }
 
     public boolean isSender(StatDataEntity statDataEntity) {
-        return statDataEntity.getStatType() == StatDataType.super_socket_send.getType() ||
-                statDataEntity.getStatType() == StatDataType.super_socket_send_repeat.getType();
+        return statDataEntity.getStatObjKey().getStatType() == StatDataType.super_socket_send.getType() ||
+                statDataEntity.getStatObjKey().getStatType() == StatDataType.super_socket_send_repeat.getType();
     }
 
     public boolean isRecver(StatDataEntity statDataEntity) {
-        return statDataEntity.getStatType() == StatDataType.super_socket_recv.getType() ||
-                statDataEntity.getStatType() == StatDataType.super_socket_recv_repeat.getType();
+        return statDataEntity.getStatObjKey().getStatType() == StatDataType.super_socket_recv.getType() ||
+                statDataEntity.getStatObjKey().getStatType() == StatDataType.super_socket_recv_repeat.getType();
     }
 
     public boolean isProxy(StatDataEntity statDataEntity) {
-        return statDataEntity.getObjType() == StatObjType.path.getType();
+//        return statDataEntity.getObjKey().getSelf().getObjType() == StatObjType.path.getType();
+        return false;
     }
 
     /**
@@ -157,7 +163,7 @@ public class StatDataServiceImpl implements IStatDataService {
     public void complementPacket(OriginalData originalData, ProtoStatObjKey objKey, ProtoDataValue dataValue, StatDataEntity statDataEntity, long timestamp,
                                  int subStatInterval, Packet packet) {
         if (isSuperSocket(statDataEntity)) {
-            packet.setSuperSocketID(statDataEntity.getObjID());
+            packet.setSuperSocketID(statDataEntity.getStatObjKey().getSelf().getObjId());
             if (objKey.getAssociatesCount() == 0) return;
             List <ProtoStatObj> associatesList = objKey.getAssociatesList();
             associatesList.parallelStream().filter(statObj -> statObj.getObjType() == StatObjType.path.getType())
@@ -171,7 +177,7 @@ public class StatDataServiceImpl implements IStatDataService {
                     });
             complementTime(packet, dataValue, statDataEntity, timestamp, subStatInterval);
         } else if (isProxy(statDataEntity)) {
-            String pathId = statDataEntity.getObjID();
+            String pathId = statDataEntity.getStatObjKey().getSelf().getObjId();
             Proxy proxy = new Proxy();
             proxy.setId(pathId);
             proxy.setTimestamp(statDataEntity.getTimestamp());

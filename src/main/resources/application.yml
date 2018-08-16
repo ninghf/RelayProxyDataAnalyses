@@ -3,7 +3,8 @@ spring:
     mongodb:
       host: 192.168.10.91
       port: 10000
-      database: sdnDB
+#      database: sdnDB
+      database: weidd
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss.SSS
     time-zone: GMT+8
@@ -12,12 +13,17 @@ spring:
     caffeine:
       spec: maximumSize=2,expireAfterAccess=1800s
     cache-names: analyses, original
+  jpa:
+    show-sql: true
 logging:
   level:
+    org.springframework.data.mongodb.core: debug
+    org.springframework.data.mongodb.repository: debug
     com.butel.project: debug
   file: D:\logs\relay_proxy.log
   pattern:
-    file: "%msg%n"
+#    file: "%msg%n"
+    console: "%msg%n"
 server:
   port: 8090
   servlet:

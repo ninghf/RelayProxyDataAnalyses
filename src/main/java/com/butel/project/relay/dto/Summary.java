@@ -1,6 +1,6 @@
 package com.butel.project.relay.dto;
 
-import com.butel.project.relay.analyses.AnalysesData;
+import com.butel.project.relay.meeting.MeetingAnalysesData;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -24,11 +24,15 @@ import java.util.Objects;
 @Setter
 public class Summary extends BaseRespDto {
 
+    private long max;
+    private long min;
     private List<Table> tables;
     private List<Option> options;
     private Map<Long, List<String>> zoom;
 
-    public void toSummary(AnalysesData analysesData) {
+    public void toSummary(MeetingAnalysesData analysesData) {
+        max = analysesData.getMax();
+        min = analysesData.getMin();
         if (Objects.nonNull(analysesData.getTransTimeDistributionDetail()))
             zoom = analysesData.getTransTimeDistributionDetail();
         if (Objects.isNull(tables))
@@ -46,23 +50,23 @@ public class Summary extends BaseRespDto {
         if (Objects.isNull(options))
             options = new LinkedList <>();
         // 数据包落点追踪
-        options.add(Option.createOption(analysesData.getPacketList(), analysesData.getAgents()));
-        options.add(Option.createOption("端到端延时分布", analysesData.getTransTimeDistribution()));
-        options.add(Option.createOption("首次延时分布", analysesData.getOnceTransTimeDistribution()));
-        options.add(Option.createOption("重复延时分布", analysesData.getRepeatTransTimeDistribution()));
-        options.add(Option.createOption("成功发送次数分布", analysesData.getSendSuccessDistribution()));
-        options.add(Option.createOption("失败发送次数分布", analysesData.getSendFailureDistribution()));
-        options.add(Option.createOption("重复成功发送次数分布", analysesData.getRepeatSuccessDistribution()));
-        options.add(Option.createOption("重复失败发送次数分布", analysesData.getRepeatFailureDistribution()));
-        List <AnalysesData.Agent> agents = analysesData.getAgents();
+        options.add(Option.createOption(analysesData.getMeetingPacketList(), analysesData.getAgents()));
+        options.add(Option.createOption("端到端延时分布", "ms", analysesData.getTransTimeDistribution()));
+        options.add(Option.createOption("首次延时分布", "ms", analysesData.getOnceTransTimeDistribution()));
+        options.add(Option.createOption("重复延时分布", "ms", analysesData.getRepeatTransTimeDistribution()));
+        options.add(Option.createOption("成功发送次数分布", "次数", analysesData.getSendSuccessDistribution()));
+        options.add(Option.createOption("失败发送次数分布", "次数", analysesData.getSendFailureDistribution()));
+        options.add(Option.createOption("重复成功发送次数分布", "次数", analysesData.getRepeatSuccessDistribution()));
+        options.add(Option.createOption("重复失败发送次数分布", "次数", analysesData.getRepeatFailureDistribution()));
+        List <MeetingAnalysesData.Agent> agents = analysesData.getAgents();
         if (Objects.nonNull(agents)) {
             int agentIdx = 1;
             for (int i = 0; i < agents.size(); i++) {
-                AnalysesData.Agent agent = agents.get(i);
-                items.add(new Item("Client->Agent" + agentIdx).builder(agent.getSendToAgentCount(), agent.getRecvFromClientCount(), agent.getPathId()));
-                items.add(new Item("Agent" + agentIdx + "中转").builder(agent.getRecvFromClientCount(), agent.getSendToRelayCount(), agent.getPathId()));
-                items.add(new Item("Agent" + agentIdx + "->Relay").builder(agent.getSendToRelayCount(), agent.getRecvFromAgentCount(), agent.getPathId()));
-                options.add(Option.createOption("Agent" + agentIdx + "延时分布", "pathId:" + agent.getPathId(), agent.getTransTimeOnAgent()));
+                MeetingAnalysesData.Agent agent = agents.get(i);
+                items.add(new Item("Client->Agent" + agentIdx).builder(agent.getSendToAgentCount(), agent.getRecvFromClientCount(), agent.getAssociateId()));
+                items.add(new Item("Agent" + agentIdx + "中转").builder(agent.getRecvFromClientCount(), agent.getSendToRelayCount(), agent.getAssociateId()));
+                items.add(new Item("Agent" + agentIdx + "->Relay").builder(agent.getSendToRelayCount(), agent.getRecvFromAgentCount(), agent.getAssociateId()));
+                options.add(Option.createOption("Agent" + agentIdx + "延时分布", "associateId:" + agent.getAssociateId(), "ms", agent.getTransTimeOnAgent()));
                 agentIdx++;
             }
         }

@@ -27,9 +27,9 @@ public class StatDataDaoImpl extends BaseDaoImpl implements IStatDataDao {
     public List <StatDataEntity> queryStatData(long startTime, long endTime, StatObjType statObjType, String... objIds) {
         Query query = new Query();
         query.addCriteria(Criteria.where("timestamp").gte(startTime).lte(endTime));
-        query.addCriteria(Criteria.where("objID").in(objIds));
-        query.addCriteria(Criteria.where("objType").is(statObjType.getType()));
-        query.addCriteria(Criteria.where("statType").in(
+        query.addCriteria(Criteria.where("statObjKey.self.objId").in(objIds));
+        query.addCriteria(Criteria.where("statObjKey.self.objType").is(statObjType.getType()));
+        query.addCriteria(Criteria.where("statObjKey.statType").in(
                 StatDataType.super_socket_send.getType(), StatDataType.super_socket_recv.getType(),
                 StatDataType.super_socket_send_repeat.getType(), StatDataType.super_socket_recv_repeat.getType()));
         return find(query, StatDataEntity.class, collectionName);

@@ -8,7 +8,8 @@ package com.butel.project.relay.constant;
  * @description TODO
  */
 public enum StatObjType {
-    nul(0), super_socket(121), path(122);
+    nul(0), super_socket(121), path(122), pLink(1),
+    XBOX_meetingType(210), XBOX_meetingUserId(211), XBOX_meetingSourceId(212);
 
     private int type;
 

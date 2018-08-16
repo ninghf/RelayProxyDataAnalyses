@@ -1,10 +1,10 @@
 package com.butel.project.relay.service.impl;
 
-import com.butel.project.relay.analyses.AnalysesData;
-import com.butel.project.relay.analyses.OriginalData;
-import com.butel.project.relay.constant.StatObjType;
+import com.butel.project.relay.meeting.MeetingAnalysesData;
+import com.butel.project.relay.meeting.MeetingIndex;
+import com.butel.project.relay.meeting.MeetingOriginalData;
 import com.butel.project.relay.service.IAnalysesService;
-import com.butel.project.relay.service.IStatDataService;
+import com.butel.project.relay.service.IMeetingStatDataService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
@@ -27,15 +27,15 @@ public class AnalysesServiceImpl implements IAnalysesService {
     public static final int bound = 60 * 1000;// 边界
 
     @Autowired
-    private IStatDataService statDataService;
+    private IMeetingStatDataService meetingStatDataService;
 
     @Override
 //    @Cacheable(value = "analyses")
-    public AnalysesData generateAnalysesData(long key, long startTime, long endTime, int transTime, String superSocketId) {
-        OriginalData originalData = generateOriginalData(startTime, endTime, superSocketId);
+    public MeetingAnalysesData generateAnalysesData(long key, long startTime, long endTime, int transTime, String superSocketId) {
+        MeetingOriginalData originalData = generateOriginalData(startTime, endTime, superSocketId);
         if (Objects.isNull(originalData))
             return null;
-        AnalysesData analysesData = new AnalysesData();
+        MeetingAnalysesData analysesData = new MeetingAnalysesData();
         analysesData.processOriginalData(originalData, transTime);
 //        if (log.isDebugEnabled())
 //            log.debug("生成分析数据：{}", analysesData);
@@ -44,24 +44,27 @@ public class AnalysesServiceImpl implements IAnalysesService {
 
     @Override
     @Cacheable(value = "original")
-    public OriginalData generateOriginalData(long startTime, long endTime, String superSocketId) {
-        OriginalData originalData = new OriginalData(startTime, endTime);
+    public MeetingOriginalData generateOriginalData(long startTime, long endTime, String superSocketId) {
+        MeetingOriginalData originalData = new MeetingOriginalData(startTime, endTime);
         // 扩大时间范围
         startTime -= bound;
         endTime += bound;
         StopWatch watch = new StopWatch();
-        watch.start("端到端");
-        statDataService.decode(originalData, startTime, endTime, StatObjType.super_socket, superSocketId);
-        watch.stop();
-        watch.start("端到Proxy, Proxy到端");
-        // 查询proxy节点信息
-        if (Objects.isNull(originalData.getPackets()))
-            return null;
-        statDataService.decode(originalData, startTime, endTime, StatObjType.path, originalData.getPaths());
+        watch.start("数据库查询、生成统计数据");
+        meetingStatDataService.decode(originalData, startTime, endTime, superSocketId);
         watch.stop();
         if (log.isDebugEnabled())
             log.debug("生成原始数据耗时：{}", watch.prettyPrint());
         return originalData;
+    }
+
+    @Override
+    public void generateOriginalData(String meetingId) {
+        MeetingOriginalData originalData = new MeetingOriginalData(0, 1);
+        meetingStatDataService.decode(originalData, new MeetingIndex("", "", "", ""));
+        MeetingAnalysesData analysesData = new MeetingAnalysesData();
+        analysesData.processOriginalData(originalData, 300);
+        log.debug("{}", analysesData);
     }
 
 }

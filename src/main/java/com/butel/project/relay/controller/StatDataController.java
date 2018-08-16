@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.butel.project.relay.analyses.AnalysesData;
 import com.butel.project.relay.dto.BaseReqDto;
 import com.butel.project.relay.dto.Summary;
+import com.butel.project.relay.meeting.MeetingAnalysesData;
 import com.butel.project.relay.service.IAnalysesService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,12 +36,15 @@ public class StatDataController {
         req.decode(json.getJSONObject("data"));
         watch.stop();
         watch.start("计算");
-        AnalysesData analysesData = service.generateAnalysesData(req.getKey(), req.getStartTime(), req.getEndTime(), req.getTransTime(), req.getSuperSocketId());
+        MeetingAnalysesData analysesData = service.generateAnalysesData(req.getKey(), req.getStartTime(), req.getEndTime(), req.getTransTime(), req.getSuperSocketId());
+        Summary summary = new Summary();
         if (Objects.isNull(analysesData))
-            return null;
+            return summary;
+        if (analysesData.isEmpty())
+            return summary;
         watch.stop();
         watch.start("包装响应数据");
-        Summary summary = new Summary();
+
         summary.toSummary(analysesData);
         watch.stop();
         summary.setTime(watch.getTotalTimeMillis());

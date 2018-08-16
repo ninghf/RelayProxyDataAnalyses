@@ -34,7 +34,7 @@ public class Series {
         this.type = type;
     }
 
-    public void addPieData(int value, String name) {
+    public void addPieData(long value, String name) {
         if (!type.equals("pie"))
             throw new IllegalArgumentException("this is pie");
         if (Objects.isNull(data))
@@ -42,7 +42,7 @@ public class Series {
         data.add(new PieData(value, name, null));
     }
 
-    public void addLineData(int x, int y, Map<String, String> extras) {
+    public void addLineData(long x, long y, Map<String, String> extras) {
         if (!type.equals("line"))
             throw new IllegalArgumentException("this is line");
         if (extras.get("repeat").equals("true"))
@@ -65,9 +65,9 @@ public class Series {
     @Getter
     @Setter
     class PieData extends Data {
-        int y;
+        long y;
         String name;
-        public PieData(int value, String name, Map<String, String> extras) {
+        public PieData(long value, String name, Map<String, String> extras) {
             super(extras);
             this.y = value;
             this.name = name;
@@ -78,10 +78,10 @@ public class Series {
     @Setter
     @JSONType(serialzeFeatures=SerializerFeature.BeanToArray, parseFeatures= Feature.SupportArrayToBean)
     class LineData extends Data {
-        int x;
-        int y;
+        long x;
+        long y;
 
-        public LineData(int x, int y, Map<String, String> extras) {
+        public LineData(long x, long y, Map<String, String> extras) {
             super(extras);
             this.x = x;
             this.y = y;

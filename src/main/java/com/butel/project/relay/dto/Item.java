@@ -5,6 +5,8 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigDecimal;
+
 /**
  * @author ninghf
  * @version 1.0.0.1
@@ -84,7 +86,19 @@ public class Item {
     public Item builder(long sendTotal, long recvTotal, String tooltips) {
         total(sendTotal, recvTotal);
         tooltips(tooltips);
+        lossRate((1 - keepFourDecimalPlaces((double)recvTotal/sendTotal)) * 100);
         return this;
+    }
+
+    /**
+     * 保留四位小数,不进行四舍五入
+     * @param d
+     * @return
+     */
+    public static double keepFourDecimalPlaces(double d) {
+        BigDecimal decimal = new BigDecimal(d);
+        double scaleValue = decimal.setScale(4, BigDecimal.ROUND_FLOOR).doubleValue();
+        return scaleValue;
     }
 
     public Item builder(long sendTotal, long recvTotal, long nonRepeatSendTotal, long nonRepeatRecvTotal, double lossRate, double sendRate, double fecLossRate, double fecRate, double repeatSpendRate, double repeatWasteRate) {

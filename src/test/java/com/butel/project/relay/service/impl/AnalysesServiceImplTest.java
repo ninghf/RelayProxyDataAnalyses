@@ -24,6 +24,7 @@ public class AnalysesServiceImplTest {
     @Test
     public void generateOriginalData() {
 //        service.generateOriginalData(1531468719000L, 1531470649000L, "11811295409737206439");
+        service.generateOriginalData("20041857");
     }
 
     @Test
