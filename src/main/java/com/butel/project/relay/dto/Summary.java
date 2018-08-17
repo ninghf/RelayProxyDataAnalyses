@@ -6,10 +6,7 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * @author ninghf
@@ -28,13 +25,15 @@ public class Summary extends BaseRespDto {
     private long min;
     private List<Table> tables;
     private List<Option> options;
-    private Map<Long, List<String>> zoom;
+    private List<MeetingAnalysesData.Slice> zoom;
 
     public void toSummary(MeetingAnalysesData analysesData) {
         max = analysesData.getMax();
         min = analysesData.getMin();
-        if (Objects.nonNull(analysesData.getTransTimeDistributionDetail()))
+        if (Objects.nonNull(analysesData.getTransTimeDistributionDetail())) {
             zoom = analysesData.getTransTimeDistributionDetail();
+            Collections.sort(zoom);
+        }
         if (Objects.isNull(tables))
             tables = new LinkedList <>();
         Table table = new Table();

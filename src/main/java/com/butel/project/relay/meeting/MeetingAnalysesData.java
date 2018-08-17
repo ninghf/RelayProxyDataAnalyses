@@ -36,7 +36,7 @@ public class MeetingAnalysesData {
     private double repeatWasteRate;
     private List<Agent> agents;
 
-    private Map<Long, List<String>> transTimeDistributionDetail;
+    private List<Slice> transTimeDistributionDetail;
 
     private Map <Long, Long> transTimeDistribution;
     private Map <Long, Long> onceTransTimeDistribution;
@@ -161,7 +161,7 @@ public class MeetingAnalysesData {
         });
 
         if (Objects.isNull(transTimeDistributionDetail))
-            transTimeDistributionDetail = new HashMap<>();
+            transTimeDistributionDetail = new LinkedList<>();
         // 数据包按照延时分组 数据包成功接收到正常、未成功接收设置延时 10000ms
         meetingPacketList.stream()
                 .collect(Collectors.groupingBy((packet) -> packet.getUserStat()._transTime(), Collectors.toList()))
@@ -191,7 +191,7 @@ public class MeetingAnalysesData {
                         long packet2 = Long.parseLong(o2.indexOf("-") > 0 ? o2.substring(0, o2.indexOf("-")) : o2);
                         return Long.compare(packet1, packet2);
                     }).collect(Collectors.toList());
-                    transTimeDistributionDetail.put(transTime, slicesToSorted);
+                    transTimeDistributionDetail.add(new Slice("<=" + transTime, transTime, slicesToSorted));
                 });
     }
 
@@ -221,5 +221,21 @@ public class MeetingAnalysesData {
         long sendToRelayCount;
         long recvFromAgentCount;
         Map<Long, Long> transTimeOnAgent;
+    }
+    @Data
+    @AllArgsConstructor
+    public class Slice implements Comparable<Slice> {
+        String range;
+        long val;
+        List<String> slices;
+
+        @Override
+        public int compareTo(Slice o) {
+            if (o.val > this.val)
+                return 1;
+            else if (o.val < this.val)
+                return -1;
+            return 0;
+        }
     }
 }

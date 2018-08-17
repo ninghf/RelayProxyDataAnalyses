@@ -51,7 +51,11 @@ public class UserStat {
     }
 
     public long transTime() {
-        return packet.getRecvTime() - packet.getSendTime();
+//        return packet.getRecvTime() - packet.getSendTime();
+        // 页面显示数据量大无法显示, 故 50ms 一个区间划分
+        long transTime = packet.getRecvTime() - packet.getSendTime();
+
+        return (transTime/50 + 1) * 50;
     }
 
     /**
