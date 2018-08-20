@@ -72,7 +72,7 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
                             long packetId = _packetIds.get(i);
                             MeetingPacket packet = originalData.getPacket(packetId, true);
                             if (Objects.nonNull(packet))
-                                packet.updateUserStatSendTime(timestamp, associateId, timestamp);
+                                packet.updateUserStatSendTime(timestamp, associateId);
                         }
 
                     });
@@ -89,7 +89,7 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
         StatObjKey objKey = new StatObjKey();
         objKey.self(superSocketId, StatObjType.super_socket.getType());
         List<StatDataEntity> statDataEntities =
-                repository.findAllByTimestampBetweenAndStatObjKey_SelfAndStatObjKey_StatTypeIn(
+                repository.findAllByTime_AdjustedTimeBetweenAndStatObjKey_SelfAndStatObjKey_StatTypeIn(
                         sendTime,
                         endTime,
                         objKey.getSelf(),
@@ -123,14 +123,14 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
                             long packetId = _packetIds.get(i);
                             MeetingPacket packet = originalData.getPacket(packetId, true);
                             if (Objects.nonNull(packet))
-                                packet.updateUserStatSendTime(time, associateId, timestamp);
+                                packet.updateUserStatSendTime(time, associateId);
                         }
                     });
                 });
         // 路径信息处理
         if (originalData.isEmpty()) return;
         List<StatDataEntity> statDataEntities_associate =
-                repository.findAllByTimestampBetweenAndStatObjKey_SelfInAndStatObjKey_StatTypeIn(
+                repository.findAllByTime_AdjustedTimeBetweenAndStatObjKey_SelfInAndStatObjKey_StatTypeIn(
                         sendTime,
                         endTime,
                         originalData.toArray(StatObjType.path),

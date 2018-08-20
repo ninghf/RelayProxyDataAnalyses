@@ -86,7 +86,8 @@ public class Item {
     public Item builder(long sendTotal, long recvTotal, String tooltips) {
         total(sendTotal, recvTotal);
         tooltips(tooltips);
-        lossRate((1 - keepFourDecimalPlaces((double)recvTotal/sendTotal)) * 100);
+        if (recvTotal > 0 && sendTotal > 0)
+            lossRate((1 - keepFourDecimalPlaces((double)recvTotal/sendTotal)) * 100);
         return this;
     }
 

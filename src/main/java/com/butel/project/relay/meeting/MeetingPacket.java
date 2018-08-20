@@ -24,8 +24,6 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
     private final UserStat userStat;
     // 网络质量（有数据包发送就创建一个NetStat）
     private List<NetStat> netStats;
-    // 第一次发送的统计时间戳, 目的是划分统计边界
-    private long timestamp;
     // 数据包是否连续
     @Setter
     private int expectIdx;
@@ -40,13 +38,11 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
      * 1) 有数据包发送就创建一个NetStat
      * 2) 更新用户体验的发送时间
      * @param sendTime
+     * @param associateId
      */
-    public void updateUserStatSendTime(long sendTime, String associateId, long timestamp) {
+    public void updateUserStatSendTime(long sendTime, String associateId) {
         addNetStat(associateId, sendTime);
         userStat.updateSendTime(sendTime);
-        if (this.timestamp == 0) this.timestamp = timestamp;
-        if (timestamp < this.timestamp)
-            this.timestamp = timestamp;
     }
 
     /**

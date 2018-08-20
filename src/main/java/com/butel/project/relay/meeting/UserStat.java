@@ -16,6 +16,10 @@ public class UserStat {
         return packet.getId();
     }
 
+    public long getSendTime() {
+        return packet.getSendTime();
+    }
+
     /**
      * sendTime 发送时间最小
      * @param sendTime

@@ -69,7 +69,7 @@ public class MeetingOriginalData {
             return null;
         // 筛选待分析的数据包
         List<MeetingPacket> packetList = packets.entrySet().stream().map(Map.Entry::getValue)
-                .filter(packet -> packet.getTimestamp() > this.startTime && packet.getTimestamp() < this.endTime)
+                .filter(packet -> packet.getUserStat().getSendTime() > this.startTime && packet.getUserStat().getSendTime() < this.endTime)
                 .sorted()
                 .collect(Collectors.toList());
         if (packetList.isEmpty())

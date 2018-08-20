@@ -8,6 +8,7 @@ public class Time {
     private long timestamp;
     private long sendTime;
     private long recvTime;
+    private long adjustedTime;
 
     public long adjust() {
         return adjustTime(recvTime, sendTime, timestamp);
