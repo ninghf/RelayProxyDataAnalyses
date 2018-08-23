@@ -17,6 +17,8 @@ spring:
     show-sql: true
 logging:
   level:
+    root: info
+    org.spark_project.jetty: info
     org.springframework.data.mongodb.core: debug
     org.springframework.data.mongodb.repository: debug
     com.butel.project: debug

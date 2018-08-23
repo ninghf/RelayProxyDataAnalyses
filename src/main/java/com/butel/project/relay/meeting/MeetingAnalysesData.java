@@ -1,9 +1,12 @@
 package com.butel.project.relay.meeting;
 
+import com.google.common.math.LongMath;
+import com.google.common.primitives.Doubles;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -61,46 +64,48 @@ public class MeetingAnalysesData {
         // 业务收包总数（即不重复数据包接收总数）
         nonRepeatRecvTotal = meetingPacketList.parallelStream().filter(MeetingPacket::isValidPointRecv).count();
         // 网络特性 原始丢包率=（1 – 实际收包/实际发包）*100
-        lossRate = recvTotal > 0 && sendTotal > 0 ? (1 - keepFourDecimalPlaces((double)recvTotal/sendTotal)) * 100 : 0;
+        lossRate = recvTotal > 0 && sendTotal > 0 ? percentage_1(recvTotal, sendTotal) : 0;
         // 发送丢包率=（1 - 业务发包/应发包）*100
         max = meetingPacketList.parallelStream().max(MeetingPacket::compareTo).get().getUserStat().getPacketId();
         min = meetingPacketList.parallelStream().min(MeetingPacket::compareTo).get().getUserStat().getPacketId();
         long perfectSendTotal = max - min + 1;
-        sendRate = nonRepeatSendTotal > 0 && perfectSendTotal > 0 ? (1 - keepFourDecimalPlaces((double)nonRepeatSendTotal/perfectSendTotal)) * 100 : 0;
+        sendRate = nonRepeatSendTotal > 0 && perfectSendTotal > 0 ? percentage_1(nonRepeatSendTotal, perfectSendTotal) : 0;
         // 纠错后丢包率=（1 - 业务收包（在超时时间范围内）/业务发包）*100
         long validNonRepeatRecvTotal = meetingPacketList.parallelStream()
-                .filter(packet -> packet.isValidPointRecv(checkTransTime)).count();
+                .filter(packet -> packet.isValidPointRecv(checkTransTime, min)).count();
         fecLossRate = validNonRepeatRecvTotal > 0 && nonRepeatSendTotal > 0 ?
-                (1 - keepFourDecimalPlaces((double)validNonRepeatRecvTotal/nonRepeatSendTotal)) * 100 : 0;
+                percentage_1(validNonRepeatRecvTotal, nonRepeatSendTotal) : 0;
         // 纠错效率=修复的数据包/问题数据包；
         long repeatSendCount = meetingPacketList.parallelStream()
                 .filter(MeetingPacket::isRepeatSend).count();
         // 修复的数据包
         long fecValidNonRepeatRecvTotal = meetingPacketList.parallelStream()
                 .filter(MeetingPacket::isRepeatSend)
-                .filter(packet -> packet.isValidPointRecv(checkTransTime)).count();
-        fecRate = fecValidNonRepeatRecvTotal > 0 && repeatSendCount > 0 ?
-                keepFourDecimalPlaces((double)fecValidNonRepeatRecvTotal/repeatSendCount) * 100 : 0;
+                .filter(packet -> packet.isValidPointRecv(checkTransTime, min)).count();
+        fecRate = fecValidNonRepeatRecvTotal > 0 && repeatSendCount > 0 ? percentage(fecValidNonRepeatRecvTotal, repeatSendCount) : 0;
         // 重传成本率：重发个数/修复包个数；
         long repeatSendCountTotal = meetingPacketList.parallelStream()
                 .collect(Collectors.summarizingLong(MeetingPacket::repeatSendCount)).getSum();
-        repeatSpendRate = repeatSendCountTotal > 0 && fecValidNonRepeatRecvTotal > 0 ?
-                keepFourDecimalPlaces((double) repeatSendCountTotal/fecValidNonRepeatRecvTotal) * 100 : 0;
+        repeatSpendRate = repeatSendCountTotal > 0 && fecValidNonRepeatRecvTotal > 0 ? percentage(repeatSendCountTotal, fecValidNonRepeatRecvTotal) : 0;
         // 重传浪费率： 收到的重复包/修改包个数；
         long repeatRecvCountTotal = meetingPacketList.parallelStream()
                 .collect(Collectors.summarizingLong(MeetingPacket::repeatRecvCount)).getSum();
         repeatWasteRate = repeatRecvCountTotal > 0 && fecValidNonRepeatRecvTotal > 0 ?
-                keepFourDecimalPlaces((double) repeatRecvCountTotal/fecValidNonRepeatRecvTotal) * 100 : 0;
+                percentage (repeatRecvCountTotal, fecValidNonRepeatRecvTotal) : 0;
 
-        // 用户质量特性 延时分布
+        // 用户质量特性 延时分布 抖动分布（抖动 = 延时 - 最小延时）
+        long minTransTime = meetingPacketList.parallelStream()
+                .filter(MeetingPacket::isValidPointRecv)// 排除没有接收到的数据包
+                .min(Comparator.comparingLong(MeetingPacket::minTransTime)).get().minTransTime();
+        // 抖动 = 延时 - 最小延时
         transTimeDistribution = meetingPacketList.parallelStream()
                 .filter(MeetingPacket::isValidPointRecv)// 排除没有接收到的数据包
-                .collect(Collectors.groupingBy((packet) -> packet.getUserStat().transTime(), Collectors.counting()));
-        // 网络特性 首次发包成功 延时分布
+                .collect(Collectors.groupingBy((packet) -> packet.getUserStat().transTime(minTransTime), Collectors.counting()));
+        // 网络特性 首次发包成功 延时分布 抖动分布
         onceTransTimeDistribution = meetingPacketList.parallelStream()
                 .filter(packet -> !packet.isRepeatSend())// 排除重复发送包
                 .filter(MeetingPacket::isValidPointRecv)
-                .collect(Collectors.groupingBy((packet) -> packet.getUserStat().transTime(), Collectors.counting()));
+                .collect(Collectors.groupingBy((packet) -> packet.getUserStat().transTime(minTransTime), Collectors.counting()));
         // 网络特性 重复发包成功 延时分布
 
         // 网络特性 用户成功收到, 数据包发送次数
@@ -144,7 +149,7 @@ public class MeetingAnalysesData {
             // 指定Agent传输数据包耗时分布
             Map <Long, Long> transTimeOnAgent = netStats_agent.parallelStream()
                     .filter(NetStat::isValidPointRecv)// 排除没有成功到达对端的数据包
-                    .collect(Collectors.groupingBy(NetStat::transTime, Collectors.counting()));
+                    .collect(Collectors.groupingBy(netStat -> netStat.transTime(minTransTime), Collectors.counting()));
             if (Objects.isNull(agents))
                 agents = new LinkedList <>();
             Agent agent = new Agent(associatesId,
@@ -164,7 +169,7 @@ public class MeetingAnalysesData {
             transTimeDistributionDetail = new LinkedList<>();
         // 数据包按照延时分组 数据包成功接收到正常、未成功接收设置延时 10000ms
         meetingPacketList.stream()
-                .collect(Collectors.groupingBy((packet) -> packet.getUserStat()._transTime(), Collectors.toList()))
+                .collect(Collectors.groupingBy((packet) -> packet.getUserStat()._transTime(minTransTime), Collectors.toList()))
                 .forEach((transTime, packets) -> {
                     List<String> slices = new LinkedList <>();
                     // 获取数据包连续片段
@@ -202,13 +207,50 @@ public class MeetingAnalysesData {
     }
 
     /**
-     * 保留四位小数,不进行四舍五入
-     * @param d
+     * p/q
+     * @param p
+     * @param q
      * @return
      */
-    public static double keepFourDecimalPlaces(double d) {
+    public static double divide(long p, long q) {
+        return (double) p/q;
+    }
+
+    /**
+     * p/q * 100
+     * @param p
+     * @param q
+     * @return
+     */
+    public static double percentage(long p, long q) {
+        return keepFourDecimalPlaces(divide(p, q) * 100, 2);
+    }
+
+    /**
+     * (1 - p/q) * 100
+     * @param p
+     * @param q
+     * @return
+     */
+    public static double percentage_1(long p, long q) {
+        return keepFourDecimalPlaces((1 - divide(p, q)) * 100, 2);
+    }
+
+    public static void main(String[] args) {
+
+        System.out.println(percentage(1, 3));
+        System.out.println(percentage_1(1, 3));
+    }
+
+    /**
+     * 保留[newScale]位小数,不进行四舍五入
+     * @param d
+     * @param newScale
+     * @return
+     */
+    public static double keepFourDecimalPlaces(double d, int newScale) {
         BigDecimal decimal = new BigDecimal(d);
-        double scaleValue = decimal.setScale(4, BigDecimal.ROUND_FLOOR).doubleValue();
+        double scaleValue = decimal.setScale(newScale, BigDecimal.ROUND_FLOOR).doubleValue();
         return scaleValue;
     }
 

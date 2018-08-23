@@ -34,6 +34,17 @@ public interface StatDataRepository extends MongoRepository<StatDataEntity, Stat
             (long from, long to, StatObjKey.ObjKey self, Integer... statType);
 
     /**
+     * 实际数据上报时间 Timestamp
+     * @param from
+     * @param to
+     * @param self
+     * @param statType
+     * @return
+     */
+    List<StatDataEntity> findAllByTimestampBetweenAndStatObjKey_SelfAndStatObjKey_StatTypeIn
+            (long from, long to, StatObjKey.ObjKey self, Integer... statType);
+
+    /**
      * 查询关联信息
      * @param from
      * @param to
@@ -42,5 +53,16 @@ public interface StatDataRepository extends MongoRepository<StatDataEntity, Stat
      * @return
      */
     List<StatDataEntity> findAllByTime_AdjustedTimeBetweenAndStatObjKey_SelfInAndStatObjKey_StatTypeIn
+            (long from, long to, Iterable<StatObjKey.ObjKey> selfs, Integer... statType);
+
+    /**
+     * 实际数据上报时间 Timestamp
+     * @param from
+     * @param to
+     * @param selfs
+     * @param statType
+     * @return
+     */
+    List<StatDataEntity> findAllByTimestampBetweenAndStatObjKey_SelfInAndStatObjKey_StatTypeIn
             (long from, long to, Iterable<StatObjKey.ObjKey> selfs, Integer... statType);
 }

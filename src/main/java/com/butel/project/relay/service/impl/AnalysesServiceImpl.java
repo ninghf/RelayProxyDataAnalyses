@@ -46,12 +46,9 @@ public class AnalysesServiceImpl implements IAnalysesService {
     @Cacheable(value = "original")
     public MeetingOriginalData generateOriginalData(long startTime, long endTime, String superSocketId) {
         MeetingOriginalData originalData = new MeetingOriginalData(startTime, endTime);
-        // 扩大时间范围
-        startTime -= bound;
-        endTime += bound;
         StopWatch watch = new StopWatch();
         watch.start("数据库查询、生成统计数据");
-        meetingStatDataService.decode(originalData, startTime, endTime, superSocketId);
+        meetingStatDataService.decode(originalData, startTime, endTime, bound, superSocketId);
         watch.stop();
         if (log.isDebugEnabled())
             log.debug("生成原始数据耗时：{}", watch.prettyPrint());

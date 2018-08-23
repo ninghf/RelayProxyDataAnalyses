@@ -14,10 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentMap;
+import java.util.*;
 
 /**
  * @author ninghf
@@ -57,26 +54,6 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
         watch.start("数据处理");
         // 并行处理
         // 处理发送数据包
-        statDataEntities.parallelStream()
-                .filter(statDataEntity -> statDataEntity.comparedWithStatDataType(StatDataType.XBOX_send))
-                .forEach(statDataEntity -> {
-                    statDataEntity.parseStatData();
-                    long timestamp = statDataEntity.getTimestamp();
-                    // 此处没有验证objType == StatObjType.pLink
-                    String associateId = statDataEntity.getStatObjKey().getAssociates().get(0).getObjId();
-                    ConcurrentMap <Long, LinkedList <Long>> packetIds = statDataEntity.getPacketIds();
-                    packetIds.entrySet().stream().forEach(entry -> {
-//                        long time = entry.getKey();
-                        LinkedList <Long> _packetIds = entry.getValue();
-                        for (int i = 0; i < _packetIds.size(); i++) {
-                            long packetId = _packetIds.get(i);
-                            MeetingPacket packet = originalData.getPacket(packetId, true);
-                            if (Objects.nonNull(packet))
-                                packet.updateUserStatSendTime(timestamp, associateId);
-                        }
-
-                    });
-                });
         // 处理接收数据包
         // 处理发送失败数据包
         watch.stop();
@@ -85,13 +62,16 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
     }
 
     @Override
-    public void decode(MeetingOriginalData originalData, long sendTime, long endTime, String superSocketId) {
+    public void decode(MeetingOriginalData originalData, long startTime, long endTime, int bound, String superSocketId) {
         StatObjKey objKey = new StatObjKey();
         objKey.self(superSocketId, StatObjType.super_socket.getType());
+        // 扩大检索数据包时间范围
+        long from  = startTime - bound;
+        long to = endTime + bound;
         List<StatDataEntity> statDataEntities =
                 repository.findAllByTime_AdjustedTimeBetweenAndStatObjKey_SelfAndStatObjKey_StatTypeIn(
-                        sendTime,
-                        endTime,
+                        from,
+                        to,
                         objKey.getSelf(),
                         StatDataType.super_socket_send.getType(),
                         StatDataType.super_socket_recv.getType(),
@@ -105,34 +85,55 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
         // 处理路径数据包
         if (statDataEntities.size() == 0) return;
         // 处理发送数据包、处理重复发送数据包、收集关联统计对象ID
-        statDataEntities.parallelStream()
+        HashMap<Long, MeetingPacket> packets = statDataEntities.parallelStream()
                 .filter(statDataEntity ->
                         statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send) ||
                                 statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send_repeat))
-                .forEach(statDataEntity -> {
-                    statDataEntity.parseStatData();
-                    long timestamp = statDataEntity.getTimestamp();
+                .collect(HashMap::new, (hashMap, statDataEntity) -> {
+                            statDataEntity.parseStatData();
+                            long adjustedTime = statDataEntity.getTime().getAdjustedTime();
+                            if (adjustedTime < startTime || adjustedTime > endTime)
+                                return;
+                            // 此处没有验证objType == StatObjType.path
+                            String associateId = statDataEntity.getStatObjKey().getAssociates().get(0).getObjId();
+                            HashMap<Long, LinkedList<Long>> packetIds = statDataEntity.getPacketIds();
+                            packetIds.entrySet().stream().forEach(entry -> {
+                                long time = entry.getKey();
+                                LinkedList<Long> _packetIds = entry.getValue();
+                                for (int i = 0; i < _packetIds.size(); i++) {
+                                    long packetId = _packetIds.get(i);
+                                    MeetingPacket packet = originalData.pack(packetId, true, hashMap);
+                                    if (Objects.nonNull(packet))
+                                        packet.updateUserStatSendTime(time, associateId, adjustedTime);
+                                }
+                            });
+                        }, (hashMap, hashMap2) -> hashMap2.entrySet().stream().forEach(entry -> {
+                            long packetId = entry.getKey();
+                            MeetingPacket packet = entry.getValue();
+                            if (hashMap.containsKey(packetId)) {
+                                hashMap.get(packetId).merge(packet);
+                            }
+                            hashMap.put(packetId, packet);
+                        })
+                );
+        originalData.setPackets(packets);
+        // 过滤数据经过的Proxy
+        HashSet<String> associateIds = statDataEntities.parallelStream()
+                .filter(statDataEntity ->
+                        statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send) ||
+                                statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send_repeat))
+                .collect(HashSet::new, (set, statDataEntity) -> {
                     // 此处没有验证objType == StatObjType.path
                     String associateId = statDataEntity.getStatObjKey().getAssociates().get(0).getObjId();
-                    originalData.collectAssociate(associateId);
-                    ConcurrentMap <Long, LinkedList <Long>> packetIds = statDataEntity.getPacketIds();
-                    packetIds.entrySet().stream().forEach(entry -> {
-                        long time = entry.getKey();
-                        LinkedList <Long> _packetIds = entry.getValue();
-                        for (int i = 0; i < _packetIds.size(); i++) {
-                            long packetId = _packetIds.get(i);
-                            MeetingPacket packet = originalData.getPacket(packetId, true);
-                            if (Objects.nonNull(packet))
-                                packet.updateUserStatSendTime(time, associateId);
-                        }
-                    });
-                });
+                    set.add(associateId);
+                }, (set, set2) -> set.addAll(set2));
+        originalData.setAssociateIds(associateIds);
         // 路径信息处理
         if (originalData.isEmpty()) return;
         List<StatDataEntity> statDataEntities_associate =
                 repository.findAllByTime_AdjustedTimeBetweenAndStatObjKey_SelfInAndStatObjKey_StatTypeIn(
-                        sendTime,
-                        endTime,
+                        from,
+                        to,
                         originalData.toArray(StatObjType.path),
                         StatDataType.super_socket_send.getType(),
                         StatDataType.super_socket_recv.getType(),
@@ -145,15 +146,14 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
                                 statDataEntity.comparedWithStatDataType(StatDataType.super_socket_recv_repeat))
                 .forEach(statDataEntity -> {
                     statDataEntity.parseStatData();
-                    long timestamp = statDataEntity.getTimestamp();
                     String associateId = statDataEntity.getStatObjKey().getSelf().getObjId();
-                    ConcurrentMap <Long, LinkedList <Long>> packetIds = statDataEntity.getPacketIds();
+                    HashMap <Long, LinkedList <Long>> packetIds = statDataEntity.getPacketIds();
                     packetIds.entrySet().stream().forEach(entry -> {
                         long time = entry.getKey();
                         LinkedList <Long> _packetIds = entry.getValue();
                         for (int i = 0; i < _packetIds.size(); i++) {
                             long packetId = _packetIds.get(i);
-                            MeetingPacket packet = originalData.getPacket(packetId, false);
+                            MeetingPacket packet = originalData.pack(packetId, false, packets);
                             if (Objects.nonNull(packet))
                                 packet.updateNetStat_ProxyRecvTime(associateId, time);
                         }
@@ -165,15 +165,14 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
                                 statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send_repeat))
                 .forEach(statDataEntity -> {
                     statDataEntity.parseStatData();
-                    long timestamp = statDataEntity.getTimestamp();
                     String associateId = statDataEntity.getStatObjKey().getSelf().getObjId();
-                    ConcurrentMap <Long, LinkedList <Long>> packetIds = statDataEntity.getPacketIds();
+                    HashMap <Long, LinkedList <Long>> packetIds = statDataEntity.getPacketIds();
                     packetIds.entrySet().stream().forEach(entry -> {
                         long time = entry.getKey();
                         LinkedList <Long> _packetIds = entry.getValue();
                         for (int i = 0; i < _packetIds.size(); i++) {
                             long packetId = _packetIds.get(i);
-                            MeetingPacket packet = originalData.getPacket(packetId, false);
+                            MeetingPacket packet = originalData.pack(packetId, false, packets);
                             if (Objects.nonNull(packet))
                                 packet.updateNetStat_ProxySendTime(associateId, time);
                         }
@@ -186,17 +185,15 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
                                 statDataEntity.comparedWithStatDataType(StatDataType.super_socket_recv_repeat))
                 .forEach(statDataEntity -> {
                     statDataEntity.parseStatData();
-                    long timestamp = statDataEntity.getTimestamp();
                     // 此处没有验证objType == StatObjType.path
                     String associateId = statDataEntity.getStatObjKey().getAssociates().get(0).getObjId();
-                    originalData.collectAssociate(associateId);
-                    ConcurrentMap <Long, LinkedList <Long>> packetIds = statDataEntity.getPacketIds();
+                    HashMap <Long, LinkedList <Long>> packetIds = statDataEntity.getPacketIds();
                     packetIds.entrySet().stream().forEach(entry -> {
                         long time = entry.getKey();
                         LinkedList <Long> _packetIds = entry.getValue();
                         for (int i = 0; i < _packetIds.size(); i++) {
                             long packetId = _packetIds.get(i);
-                            MeetingPacket packet = originalData.getPacket(packetId, false);
+                            MeetingPacket packet = originalData.pack(packetId, false, packets);
                             if (Objects.nonNull(packet))
                                 packet.updateUserStatRecvTime(time, associateId);
                         }

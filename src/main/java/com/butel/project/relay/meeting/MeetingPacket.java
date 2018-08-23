@@ -23,7 +23,9 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
     // 用户感受（丢包、延时）
     private final UserStat userStat;
     // 网络质量（有数据包发送就创建一个NetStat）
-    private List<NetStat> netStats;
+    private List<NetStat> netStats = new LinkedList<>();
+    // 第一次发送的统计时间戳, 目的是划分统计边界
+    private long timestamp;
     // 数据包是否连续
     @Setter
     private int expectIdx;
@@ -40,9 +42,26 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
      * @param sendTime
      * @param associateId
      */
-    public void updateUserStatSendTime(long sendTime, String associateId) {
+    public void updateUserStatSendTime(long sendTime, String associateId, long timestamp) {
         addNetStat(associateId, sendTime);
         userStat.updateSendTime(sendTime);
+        if (this.timestamp == 0) this.timestamp = timestamp;
+        if (timestamp < this.timestamp)
+            this.timestamp = timestamp;
+    }
+
+    public long sendTime() {
+        return userStat.getSendTime();
+    }
+
+    public List<String> associateIds() {
+        List<String> associateIds = new LinkedList<>();
+        netStats.stream().forEach(netStat -> associateIds.add(netStat.associateId()));
+        return associateIds;
+    }
+
+    public void merge(MeetingPacket packet) {
+        packet.associateIds().stream().forEach(associateId -> updateUserStatSendTime(packet.sendTime(), associateId, packet.getTimestamp()));
     }
 
     /**
@@ -52,7 +71,6 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
      * @param recvTime
      */
     public void updateUserStatRecvTime(long recvTime, String associateId) {
-        userStat.updateRecvTime(recvTime);
         List<NetStat> subsetStats = netStats.parallelStream()
                 .filter(netStat -> netStat.isExist(associateId))
                 .collect(Collectors.toList());
@@ -71,16 +89,11 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
                         return 0;
                     }).ifPresent(netStat -> netStat.updatePacketRecvTime(recvTime));
         }
-
+        userStat.updateRecvTime(recvTime);
     }
 
-    public void generateNetStats() {
-        if (Objects.isNull(netStats))
-            netStats = new LinkedList<>();
-    }
 
     public void addNetStat(String associateId, long sendTime) {
-        generateNetStats();
         NetStat netStat = new NetStat(userStat.getPacketId(), associateId);
         netStat.updatePacketSendTime(sendTime);
         netStats.add(netStat);
@@ -172,9 +185,9 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
      * @param checkTransTime
      * @return
      */
-    public boolean isValidPointRecv(long checkTransTime) {
+    public boolean isValidPointRecv(long checkTransTime, long min) {
         if (isValidPointRecv()) {
-            long transTime = userStat.transTime();
+            long transTime = userStat.transTime(min);
             if (checkTransTime >= transTime) return true;
         }
         return false;
@@ -242,6 +255,10 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
      */
     public boolean isSendToAgent(String associatesId) {
         return netStats.parallelStream().anyMatch(netStat -> netStat.isSendToAgent(associatesId));
+    }
+
+    public long minTransTime() {
+        return userStat.minTransTime();
     }
 
 }

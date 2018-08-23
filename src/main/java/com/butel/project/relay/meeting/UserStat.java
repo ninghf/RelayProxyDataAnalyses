@@ -54,24 +54,28 @@ public class UserStat {
         return packet.isValidRecv();
     }
 
-    public long transTime() {
+    public long transTime(long min) {
 //        return packet.getRecvTime() - packet.getSendTime();
         // 页面显示数据量大无法显示, 故 50ms 一个区间划分
         long transTime = packet.getRecvTime() - packet.getSendTime();
 
-        return (transTime/50 + 1) * 50;
+        return ((transTime - min)/50 + 1) * 50;
     }
 
     /**
      * 设置未成功接收的数据延时行为是 10000ms
      * @return
      */
-    public long _transTime() {
+    public long _transTime(long min) {
         if (isValidRecv()) {
             long transTime = packet.getRecvTime() - packet.getSendTime();
 
-            return (transTime/50 + 1) * 50;
+            return ((transTime - min)/50 + 1) * 50;
         }
         return 10000L;
+    }
+
+    public long minTransTime() {
+        return packet.getRecvTime() - packet.getSendTime();
     }
 }

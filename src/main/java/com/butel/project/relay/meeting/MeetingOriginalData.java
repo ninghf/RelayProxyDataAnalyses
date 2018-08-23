@@ -2,9 +2,10 @@ package com.butel.project.relay.meeting;
 
 import com.butel.project.relay.constant.StatObjType;
 import com.butel.project.relay.entity.StatObjKey;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,35 +22,18 @@ import java.util.stream.Stream;
  * @description TODO
  */
 @RequiredArgsConstructor
+@Data
 public class MeetingOriginalData {
 
     @NonNull private long startTime;
     @NonNull private long endTime;
 
     // 关联统计对象
-    private ConcurrentSkipListSet<String> associateIds;
+    private Set<String> associateIds;
     // 数据包
-    private ConcurrentMap<Long, MeetingPacket> packets;
+    private HashMap<Long, MeetingPacket> packets;
 
-    public void collectAssociate(String associateId) {
-        if (Objects.isNull(associateIds))
-            associateIds = new ConcurrentSkipListSet<>();
-        associateIds.add(associateId);
-    }
-
-    public List<StatObjKey.ObjKey> toArray(StatObjType objType) {
-        List<StatObjKey.ObjKey> selfs = new LinkedList<>();
-        associateIds.stream().forEach(associateId -> {
-            StatObjKey objKey = new StatObjKey();
-            objKey.self(associateId, objType.getType());
-            selfs.add(objKey.getSelf());
-        });
-        return selfs;
-    }
-
-    public MeetingPacket getPacket(long packetId, boolean create) {
-        if (Objects.isNull(packets))
-            packets = new ConcurrentHashMap<>();
+    public MeetingPacket pack(long packetId, boolean create, HashMap<Long, MeetingPacket> packets) {
         MeetingPacket packet = null;
         if (!packets.containsKey(packetId)) {
             if (create) {
@@ -62,6 +46,16 @@ public class MeetingOriginalData {
         return packet;
     }
 
+    public List<StatObjKey.ObjKey> toArray(StatObjType objType) {
+        List<StatObjKey.ObjKey> selfs = new LinkedList<>();
+        associateIds.stream().forEach(associateId -> {
+            StatObjKey objKey = new StatObjKey();
+            objKey.self(associateId, objType.getType());
+            selfs.add(objKey.getSelf());
+        });
+        return selfs;
+    }
+
     public List<MeetingPacket> generateSequentialPackets() {
         if (Objects.isNull(packets))
             return null;
@@ -69,7 +63,7 @@ public class MeetingOriginalData {
             return null;
         // 筛选待分析的数据包
         List<MeetingPacket> packetList = packets.entrySet().stream().map(Map.Entry::getValue)
-                .filter(packet -> packet.getUserStat().getSendTime() > this.startTime && packet.getUserStat().getSendTime() < this.endTime)
+//                .filter(packet -> packet.getTimestamp() > this.startTime && packet.getTimestamp() < this.endTime)
                 .sorted()
                 .collect(Collectors.toList());
         if (packetList.isEmpty())

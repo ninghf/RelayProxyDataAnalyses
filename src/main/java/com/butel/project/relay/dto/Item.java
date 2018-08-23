@@ -87,18 +87,48 @@ public class Item {
         total(sendTotal, recvTotal);
         tooltips(tooltips);
         if (recvTotal > 0 && sendTotal > 0)
-            lossRate((1 - keepFourDecimalPlaces((double)recvTotal/sendTotal)) * 100);
+            lossRate(percentage_1(recvTotal, sendTotal));
         return this;
     }
 
     /**
-     * 保留四位小数,不进行四舍五入
+     * p/q * 100
+     * @param p
+     * @param q
+     * @return
+     */
+    public static double percentage(long p, long q) {
+        return keepFourDecimalPlaces(divide(p, q) * 100, 2);
+    }
+
+    /**
+     * (1 - p/q) * 100
+     * @param p
+     * @param q
+     * @return
+     */
+    public static double percentage_1(long p, long q) {
+        return keepFourDecimalPlaces((1 - divide(p, q)) * 100, 2);
+    }
+
+    /**
+     * p/q
+     * @param p
+     * @param q
+     * @return
+     */
+    public static double divide(long p, long q) {
+        return (double) p/q;
+    }
+
+    /**
+     * 保留[newScale]位小数,不进行四舍五入
      * @param d
      * @return
      */
-    public static double keepFourDecimalPlaces(double d) {
+    public static double keepFourDecimalPlaces(double d, int newScale) {
         BigDecimal decimal = new BigDecimal(d);
-        double scaleValue = decimal.setScale(4, BigDecimal.ROUND_FLOOR).doubleValue();
+        double scaleValue = decimal.setScale(newScale, BigDecimal.ROUND_FLOOR).doubleValue();
         return scaleValue;
     }
 

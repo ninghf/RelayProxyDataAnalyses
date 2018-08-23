@@ -13,6 +13,7 @@ import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
@@ -80,7 +81,7 @@ public class StatDataEntity {
     @Transient
     private static final long bit = 1;
     @Transient
-    private ConcurrentMap<Long, LinkedList<Long>> packetIds = new ConcurrentHashMap <>();
+    private HashMap<Long, LinkedList<Long>> packetIds;
 
     public void parseStatData() {
         byte[] data = itemValue.getData();
@@ -90,18 +91,20 @@ public class StatDataEntity {
             if (Objects.nonNull(statItemValue)) {
                 final int subStatInterval = statItemValue.getSubStatInterval();
                 final long tickTimestamp = statItemValue.getTimestamp();
-                final long adjustTime = time.adjust();
+//                final long adjustTime = time.adjust();
+                // 统计小周期
                 List<ProtoDataValue> dataValuesList = statItemValue.getDataValuesList();
                 if (Objects.nonNull(dataValuesList) && !dataValuesList.isEmpty()) {
-                    dataValuesList.parallelStream()
+                    packetIds = dataValuesList.parallelStream()
                             .filter(dataValue -> Objects.nonNull(dataValue))
-                            .forEach(dataValue -> {
-//                                long time = tickTimestamp + subStatInterval * dataValue.getIndex();
-                                long time = adjustTime + subStatInterval * dataValue.getIndex();
-                                List <ProtoBitmapValue> bitmapValuesList = dataValue.getBitmapValuesList();
+                            .collect(HashMap::new, (hashMap, dataValue) -> {
+                                long time = tickTimestamp + subStatInterval * dataValue.getIndex();
+//                                long time = adjustTime + subStatInterval * dataValue.getIndex();
+                                // 统计小周期--数据包列表
+                                List<ProtoBitmapValue> bitmapValuesList = dataValue.getBitmapValuesList();
                                 if (Objects.nonNull(bitmapValuesList) && !bitmapValuesList.isEmpty()) {
-                                    LinkedList <Long> packetIds = bitmapValuesList.parallelStream()
-                                            .collect(() -> new LinkedList <>(), (list, bitmapValue) -> {
+                                    LinkedList<Long> packetIds = bitmapValuesList.parallelStream()
+                                            .collect(LinkedList::new, (list, bitmapValue) -> {
                                                 long index = bitmapValue.getIndex();
                                                 long bitMap = bitmapValue.getBitMap();
                                                 for (int j = 0; j < unit; j++) {
@@ -111,10 +114,9 @@ public class StatDataEntity {
                                                     }
                                                 }
                                             }, (list1, list2) -> list1.addAll(list2));
-                                    this.packetIds.put(time, packetIds);
-
+                                    hashMap.put(time, packetIds);
                                 }
-                            });
+                            }, (hashMap, hashMap2) -> hashMap.putAll(hashMap2));
                 }
             }
         } catch (InvalidProtocolBufferException e) {
@@ -126,29 +128,4 @@ public class StatDataEntity {
         return statObjKey.getStatType() == type.getType();
     }
 
-//    public MeetingIndex parseMeetingIndex() {
-//        MeetingIndex meetingIdx = new MeetingIndex();
-//        meetingIdx.setMeetingId(statObjKey.getSelf().objId);
-//        if (Objects.isNull(statObjKey))
-//            return meetingIdx;
-//        List <StatObjKey.ObjKey> associatesList = statObjKey.getAssociates();
-//        if (Objects.nonNull(associatesList)) {
-//            for (int i = 0; i < associatesList.size(); i++) {
-//                StatObjKey.ObjKey objKey = associatesList.get(i);
-//                switch (objKey.objType) {
-//                    case 1:
-//                        meetingIdx.setPLinkId(objKey.objId);
-//                        break;
-//                    case 211:
-//                        meetingIdx.setUserId(objKey.objId);
-//                        break;
-//                    case 212:
-//                        meetingIdx.setSourceId(objKey.objId);
-//                        break;
-//                }
-//            }
-//        }
-//        return meetingIdx;
-//
-//    }
 }

@@ -1,5 +1,6 @@
 package com.butel.project.relay.dto;
 
+import com.butel.project.relay.job.Job;
 import com.butel.project.relay.meeting.MeetingAnalysesData;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,6 +22,8 @@ import java.util.*;
 @Setter
 public class Summary extends BaseRespDto {
 
+    private Date startTime;
+    private Date endTime;
     private long max;
     private long min;
     private List<Table> tables;
@@ -69,5 +72,22 @@ public class Summary extends BaseRespDto {
                 agentIdx++;
             }
         }
+    }
+
+    public static List<Summary> toSummarys(List<Job> jobs) {
+        List<Summary> summaries = new LinkedList<>();
+        for (int i = 0; i < jobs.size(); i++) {
+            Job job = jobs.get(i);
+            if (Objects.isNull(job.getAnalysesData()))
+                continue;
+            if (job.getAnalysesData().isEmpty())
+                continue;
+            Summary summary = new Summary();
+            summaries.add(summary);
+            summary.setStartTime(new Date(job.getOriginalData().getStartTime()));
+            summary.setEndTime(new Date(job.getOriginalData().getEndTime()));
+            summary.toSummary(job.getAnalysesData());
+        }
+        return summaries;
     }
 }

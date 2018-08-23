@@ -87,12 +87,12 @@ public class NetStat {
         return Objects.equals(associatesId, proxy.getId());
     }
 
-    public long transTime() {
+    public long transTime(long min) {
 //        return packet.getRecvTime() - packet.getSendTime();
         // 页面显示数据量大无法显示, 故 50ms 一个区间划分
         long transTime = packet.getRecvTime() - packet.getSendTime();
 
-        return (transTime/50 + 1) * 50;
+        return ((transTime - min)/50 + 1) * 50;
     }
 
     // 为详细落点提示信息
@@ -106,5 +106,9 @@ public class NetStat {
             extras.put("associatesId", proxy.getId());
         }
         return extras;
+    }
+
+    public String associateId() {
+        return proxy.getId();
     }
 }
