@@ -1,6 +1,6 @@
 package com.butel.project.relay.service;
 
-import com.butel.project.relay.analyses.AnalysesData;
+import com.butel.project.relay.constant.StatObjType;
 import com.butel.project.relay.meeting.MeetingAnalysesData;
 import com.butel.project.relay.meeting.MeetingOriginalData;
 
@@ -13,7 +13,7 @@ import com.butel.project.relay.meeting.MeetingOriginalData;
  */
 public interface IAnalysesService {
 
-    MeetingAnalysesData generateAnalysesData(long key, long startTime, long endTime, int transTime, String superSocketId);
-    MeetingOriginalData generateOriginalData(long startTime, long endTime, String superSocketId);
+    MeetingAnalysesData generateAnalysesData(long key, long startTime, long endTime, int transTime, StatObjType objType, String objId);
+    MeetingOriginalData generateOriginalData(long startTime, long endTime, StatObjType objType, String objId);
     void generateOriginalData(String meetingId);
 }

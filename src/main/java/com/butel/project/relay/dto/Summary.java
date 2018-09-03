@@ -33,6 +33,33 @@ public class Summary extends BaseRespDto {
     public void toSummary(MeetingAnalysesData analysesData) {
         max = analysesData.getMax();
         min = analysesData.getMin();
+        if (Objects.isNull(tables))
+            tables = new LinkedList <>();
+        Table table = new Table();
+        List<Item> items = new LinkedList <>();
+        items.add(new Item("端到端").builder(
+                analysesData.getSendTotal(), analysesData.getRecvTotal(),
+                analysesData.getNonRepeatSendTotal(), analysesData.getNonRepeatRecvTotal(),
+                analysesData.getLossRate(), analysesData.getSendRate(), analysesData.getFecLossRate(), analysesData.getFecRate(),
+                analysesData.getRepeatSpendRate(), analysesData.getRepeatWasteRate()));
+        table.setItems(items);
+        tables.add(table);
+        List <MeetingAnalysesData.Agent> agents = analysesData.getAgents();
+        if (Objects.nonNull(agents)) {
+            int agentIdx = 1;
+            for (int i = 0; i < agents.size(); i++) {
+                MeetingAnalysesData.Agent agent = agents.get(i);
+                items.add(new Item("Client->Agent" + agentIdx).builder(agent.getSendToAgentCount(), agent.getRecvFromClientCount(), agent.getAssociateId()));
+                items.add(new Item("Agent" + agentIdx + "中转").builder(agent.getRecvFromClientCount(), agent.getSendToRelayCount(), agent.getAssociateId()));
+                items.add(new Item("Agent" + agentIdx + "->Relay").builder(agent.getSendToRelayCount(), agent.getRecvFromAgentCount(), agent.getAssociateId()));
+                agentIdx++;
+            }
+        }
+    }
+
+    public void toDetail(MeetingAnalysesData analysesData) {
+        max = analysesData.getMax();
+        min = analysesData.getMin();
         if (Objects.nonNull(analysesData.getTransTimeDistributionDetail())) {
             zoom = analysesData.getTransTimeDistributionDetail();
             Collections.sort(zoom);
@@ -84,8 +111,8 @@ public class Summary extends BaseRespDto {
                 continue;
             Summary summary = new Summary();
             summaries.add(summary);
-            summary.setStartTime(new Date(job.getOriginalData().getStartTime()));
-            summary.setEndTime(new Date(job.getOriginalData().getEndTime()));
+            summary.setStartTime(new Date(job.getStartTime()));
+            summary.setEndTime(new Date(job.getEndTime()));
             summary.toSummary(job.getAnalysesData());
         }
         return summaries;

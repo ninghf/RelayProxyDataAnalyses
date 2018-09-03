@@ -14,5 +14,5 @@ import com.butel.project.relay.meeting.MeetingOriginalData;
 public interface IMeetingStatDataService {
 
     void decode(MeetingOriginalData originalData, MeetingIndex idx);
-    void decode(MeetingOriginalData originalData, long startTime, long endTime, int bound, String superSocketId);
+    void decode(MeetingOriginalData originalData, long startTime, long endTime, int bound, StatObjType objType, String objId);
 }

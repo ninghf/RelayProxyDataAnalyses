@@ -1,12 +1,9 @@
 package com.butel.project.relay.meeting;
 
-import com.google.common.math.LongMath;
-import com.google.common.primitives.Doubles;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -50,8 +47,8 @@ public class MeetingAnalysesData {
     private Map <Long, Long> repeatSuccessDistribution;
     private Map <Long, Long> repeatFailureDistribution;
 
-    public void processOriginalData(MeetingOriginalData originalData, final long checkTransTime) {
-        meetingPacketList = originalData.generateSequentialPackets();
+    public void processOriginalData(MeetingOriginalData originalData, final long checkTransTime, final long startTime, final long endTime) {
+        meetingPacketList = originalData.generateSequentialPackets(startTime, endTime);
         if (Objects.isNull(meetingPacketList) || meetingPacketList.isEmpty())
             return;
         // 端到端概要信息
@@ -65,14 +62,18 @@ public class MeetingAnalysesData {
         nonRepeatRecvTotal = meetingPacketList.parallelStream().filter(MeetingPacket::isValidPointRecv).count();
         // 网络特性 原始丢包率=（1 – 实际收包/实际发包）*100
         lossRate = recvTotal > 0 && sendTotal > 0 ? percentage_1(recvTotal, sendTotal) : 0;
+        // 用户质量特性 延时分布 抖动分布（抖动 = 延时 - 最小延时）
+        long minTransTime = meetingPacketList.parallelStream()
+                                             .filter(MeetingPacket::isValidPointRecv)// 排除没有接收到的数据包
+                                             .min(Comparator.comparingLong(MeetingPacket::minTransTime)).get().minTransTime();
         // 发送丢包率=（1 - 业务发包/应发包）*100
         max = meetingPacketList.parallelStream().max(MeetingPacket::compareTo).get().getUserStat().getPacketId();
         min = meetingPacketList.parallelStream().min(MeetingPacket::compareTo).get().getUserStat().getPacketId();
         long perfectSendTotal = max - min + 1;
         sendRate = nonRepeatSendTotal > 0 && perfectSendTotal > 0 ? percentage_1(nonRepeatSendTotal, perfectSendTotal) : 0;
-        // 纠错后丢包率=（1 - 业务收包（在超时时间范围内）/业务发包）*100
+        // 纠错后丢包率 =（1 - 业务收包（在超时时间范围内）/业务发包）*100
         long validNonRepeatRecvTotal = meetingPacketList.parallelStream()
-                .filter(packet -> packet.isValidPointRecv(checkTransTime, min)).count();
+                .filter(packet -> packet.isValidPointRecv(checkTransTime, minTransTime)).count();
         fecLossRate = validNonRepeatRecvTotal > 0 && nonRepeatSendTotal > 0 ?
                 percentage_1(validNonRepeatRecvTotal, nonRepeatSendTotal) : 0;
         // 纠错效率=修复的数据包/问题数据包；
@@ -81,7 +82,7 @@ public class MeetingAnalysesData {
         // 修复的数据包
         long fecValidNonRepeatRecvTotal = meetingPacketList.parallelStream()
                 .filter(MeetingPacket::isRepeatSend)
-                .filter(packet -> packet.isValidPointRecv(checkTransTime, min)).count();
+                .filter(packet -> packet.isValidPointRecv(checkTransTime, minTransTime)).count();
         fecRate = fecValidNonRepeatRecvTotal > 0 && repeatSendCount > 0 ? percentage(fecValidNonRepeatRecvTotal, repeatSendCount) : 0;
         // 重传成本率：重发个数/修复包个数；
         long repeatSendCountTotal = meetingPacketList.parallelStream()
@@ -93,10 +94,6 @@ public class MeetingAnalysesData {
         repeatWasteRate = repeatRecvCountTotal > 0 && fecValidNonRepeatRecvTotal > 0 ?
                 percentage (repeatRecvCountTotal, fecValidNonRepeatRecvTotal) : 0;
 
-        // 用户质量特性 延时分布 抖动分布（抖动 = 延时 - 最小延时）
-        long minTransTime = meetingPacketList.parallelStream()
-                .filter(MeetingPacket::isValidPointRecv)// 排除没有接收到的数据包
-                .min(Comparator.comparingLong(MeetingPacket::minTransTime)).get().minTransTime();
         // 抖动 = 延时 - 最小延时
         transTimeDistribution = meetingPacketList.parallelStream()
                 .filter(MeetingPacket::isValidPointRecv)// 排除没有接收到的数据包

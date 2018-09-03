@@ -1,6 +1,7 @@
 package com.butel.project.relay.entity;
 
 import com.butel.project.relay.constant.StatDataType;
+import com.butel.project.relay.constant.StatObjType;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoDataValue;
 import com.butel.project.relay.protobuf.SDNMessage.ProtoStatItemValue.ProtoDataValue.ProtoBitmapValue;
@@ -8,6 +9,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang.time.DateFormatUtils;
 import org.bson.types.Binary;
 import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Transient;
@@ -17,8 +19,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 /**
  * @author ninghf
@@ -101,6 +102,8 @@ public class StatDataEntity {
                                 long time = tickTimestamp + subStatInterval * dataValue.getIndex();
 //                                long time = adjustTime + subStatInterval * dataValue.getIndex();
                                 // 统计小周期--数据包列表
+                                // 本周期内数据包个数
+                                long sum = dataValue.getSum();
                                 List<ProtoBitmapValue> bitmapValuesList = dataValue.getBitmapValuesList();
                                 if (Objects.nonNull(bitmapValuesList) && !bitmapValuesList.isEmpty()) {
                                     LinkedList<Long> packetIds = bitmapValuesList.parallelStream()
@@ -110,11 +113,16 @@ public class StatDataEntity {
                                                 for (int j = 0; j < unit; j++) {
                                                     if ((bitMap & (bit << j)) != 0) {
                                                         long packetId = index * unit + j;
+//                                                        log.debug("发送时间【{}】汇报者【{}】数据包【{}】重复性【{}】", DateFormatUtils.format(this.time.getAdjustedTime(), "yyyy-MM-dd HH:mm:ss.SSS"), statObjKey.getSelf().objType, packetId, statObjKey.getStatType());
                                                         list.add(packetId);
                                                     }
                                                 }
                                             }, (list1, list2) -> list1.addAll(list2));
                                     hashMap.put(time, packetIds);
+                                    if (sum != packetIds.size()) {
+                                        log.debug("发送时间【{}】汇报者【{}】总数【{}】bitMap【{}】【{}】数据包【{}】【{}】重复性【{}】", DateFormatUtils.format(this.time.getTimestamp(), "yyyy-MM-dd HH:mm:ss.SSS"), statObjKey.getSelf().objType, sum, dataValue.getBitmapValuesCount(), packetIds.size(), packetIds, statObjKey.getStatType());
+                                        log.debug("{}", this.time);
+                                    }
                                 }
                             }, (hashMap, hashMap2) -> hashMap.putAll(hashMap2));
                 }
@@ -126,6 +134,17 @@ public class StatDataEntity {
 
     public boolean comparedWithStatDataType(StatDataType type) {
         return statObjKey.getStatType() == type.getType();
+    }
+
+    public String getAssociateId(StatObjType objType) {
+        String associateId = null;
+        if (Objects.nonNull(statObjKey)) {
+            List<StatObjKey.ObjKey> associateIds = statObjKey.getAssociates().parallelStream().filter(objKey -> objKey.objType == objType.getType())
+                    .collect(Collectors.toList());
+            if (!associateIds.isEmpty())
+                associateId = associateIds.get(0).getObjId();
+        }
+        return associateId;
     }
 
 }

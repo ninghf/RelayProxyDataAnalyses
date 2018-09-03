@@ -62,9 +62,9 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
     }
 
     @Override
-    public void decode(MeetingOriginalData originalData, long startTime, long endTime, int bound, String superSocketId) {
+    public void decode(MeetingOriginalData originalData, long startTime, long endTime, int bound, StatObjType objType, String objId) {
         StatObjKey objKey = new StatObjKey();
-        objKey.self(superSocketId, StatObjType.super_socket.getType());
+        objKey.self(objId, StatObjType.super_socket.getType());
         // 扩大检索数据包时间范围
         long from  = startTime - bound;
         long to = endTime + bound;
@@ -86,23 +86,23 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
         if (statDataEntities.size() == 0) return;
         // 处理发送数据包、处理重复发送数据包、收集关联统计对象ID
         HashMap<Long, MeetingPacket> packets = statDataEntities.parallelStream()
-                .filter(statDataEntity ->
-                        statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send) ||
-                                statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send_repeat))
+                .filter(statDataEntity -> statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send))
                 .collect(HashMap::new, (hashMap, statDataEntity) -> {
                             statDataEntity.parseStatData();
                             long adjustedTime = statDataEntity.getTime().getAdjustedTime();
-                            if (adjustedTime < startTime || adjustedTime > endTime)
-                                return;
-                            // 此处没有验证objType == StatObjType.path
-                            String associateId = statDataEntity.getStatObjKey().getAssociates().get(0).getObjId();
+                            if (statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send)) {
+                                if (adjustedTime < startTime || adjustedTime > endTime)
+                                    return;
+                            }
+                            // 验证objType == StatObjType.path
+                            String associateId = statDataEntity.getAssociateId(StatObjType.path);
                             HashMap<Long, LinkedList<Long>> packetIds = statDataEntity.getPacketIds();
                             packetIds.entrySet().stream().forEach(entry -> {
                                 long time = entry.getKey();
                                 LinkedList<Long> _packetIds = entry.getValue();
                                 for (int i = 0; i < _packetIds.size(); i++) {
                                     long packetId = _packetIds.get(i);
-                                    MeetingPacket packet = originalData.pack(packetId, true, hashMap);
+                                    MeetingPacket packet = originalData.pack(packetId, true, StatDataType.super_socket_send, hashMap);
                                     if (Objects.nonNull(packet))
                                         packet.updateUserStatSendTime(time, associateId, adjustedTime);
                                 }
@@ -116,15 +116,35 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
                             hashMap.put(packetId, packet);
                         })
                 );
+//        packets.keySet().stream().sorted().forEach(packetId -> log.debug("{}", packetId));
         originalData.setPackets(packets);
+        // 收集重复包数据
+        statDataEntities.parallelStream()
+                        .filter(statDataEntity -> statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send_repeat))
+                        .forEach(statDataEntity -> {
+                            statDataEntity.parseStatData();
+                            // 验证objType == StatObjType.path
+                            String associateId = statDataEntity.getAssociateId(StatObjType.path);
+                            HashMap<Long, LinkedList<Long>> packetIds = statDataEntity.getPacketIds();
+                            packetIds.entrySet().stream().forEach(entry -> {
+                                long time = entry.getKey();
+                                LinkedList<Long> _packetIds = entry.getValue();
+                                for (int i = 0; i < _packetIds.size(); i++) {
+                                    long packetId = _packetIds.get(i);
+                                    MeetingPacket packet = originalData.pack(packetId, false, StatDataType.nul, packets);
+                                    if (Objects.nonNull(packet))
+                                        packet.updateUserStatSendTime(time, associateId, -1);
+                                }
+                            });
+                        });
         // 过滤数据经过的Proxy
         HashSet<String> associateIds = statDataEntities.parallelStream()
                 .filter(statDataEntity ->
                         statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send) ||
                                 statDataEntity.comparedWithStatDataType(StatDataType.super_socket_send_repeat))
                 .collect(HashSet::new, (set, statDataEntity) -> {
-                    // 此处没有验证objType == StatObjType.path
-                    String associateId = statDataEntity.getStatObjKey().getAssociates().get(0).getObjId();
+                    // 验证objType == StatObjType.path
+                    String associateId = statDataEntity.getAssociateId(StatObjType.path);
                     set.add(associateId);
                 }, (set, set2) -> set.addAll(set2));
         originalData.setAssociateIds(associateIds);
@@ -153,7 +173,7 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
                         LinkedList <Long> _packetIds = entry.getValue();
                         for (int i = 0; i < _packetIds.size(); i++) {
                             long packetId = _packetIds.get(i);
-                            MeetingPacket packet = originalData.pack(packetId, false, packets);
+                            MeetingPacket packet = originalData.pack(packetId, false, StatDataType.nul, packets);
                             if (Objects.nonNull(packet))
                                 packet.updateNetStat_ProxyRecvTime(associateId, time);
                         }
@@ -172,7 +192,7 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
                         LinkedList <Long> _packetIds = entry.getValue();
                         for (int i = 0; i < _packetIds.size(); i++) {
                             long packetId = _packetIds.get(i);
-                            MeetingPacket packet = originalData.pack(packetId, false, packets);
+                            MeetingPacket packet = originalData.pack(packetId, false, StatDataType.nul, packets);
                             if (Objects.nonNull(packet))
                                 packet.updateNetStat_ProxySendTime(associateId, time);
                         }
@@ -185,15 +205,15 @@ public class MeetingStatDataServiceImpl implements IMeetingStatDataService {
                                 statDataEntity.comparedWithStatDataType(StatDataType.super_socket_recv_repeat))
                 .forEach(statDataEntity -> {
                     statDataEntity.parseStatData();
-                    // 此处没有验证objType == StatObjType.path
-                    String associateId = statDataEntity.getStatObjKey().getAssociates().get(0).getObjId();
+                    // 验证objType == StatObjType.path
+                    String associateId = statDataEntity.getAssociateId(StatObjType.path);
                     HashMap <Long, LinkedList <Long>> packetIds = statDataEntity.getPacketIds();
                     packetIds.entrySet().stream().forEach(entry -> {
                         long time = entry.getKey();
                         LinkedList <Long> _packetIds = entry.getValue();
                         for (int i = 0; i < _packetIds.size(); i++) {
                             long packetId = _packetIds.get(i);
-                            MeetingPacket packet = originalData.pack(packetId, false, packets);
+                            MeetingPacket packet = originalData.pack(packetId, false, StatDataType.nul, packets);
                             if (Objects.nonNull(packet))
                                 packet.updateUserStatRecvTime(time, associateId);
                         }

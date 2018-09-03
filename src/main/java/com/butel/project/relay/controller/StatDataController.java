@@ -1,7 +1,6 @@
 package com.butel.project.relay.controller;
 
 import com.alibaba.fastjson.JSONObject;
-import com.butel.project.relay.analyses.AnalysesData;
 import com.butel.project.relay.constant.StatObjType;
 import com.butel.project.relay.dto.BaseReqDto;
 import com.butel.project.relay.dto.Summary;
@@ -62,7 +61,25 @@ public class StatDataController {
 
     @RequestMapping(method = RequestMethod.POST, path = "/detail")
     @CrossOrigin()
-    public void getDetailData(@RequestBody JSONObject json) {
-
+    public Summary getDetailData(@RequestBody JSONObject json) {
+        StopWatch watch = new StopWatch();
+        watch.start("解析请求数据");
+        BaseReqDto req = new BaseReqDto();
+        req.decode(json.getJSONObject("data"));
+        watch.stop();
+        watch.start("计算");
+        Summary summary = new Summary();
+        MeetingAnalysesData analysesData = service.generateAnalysesData(req.getKey(), req.getStartTime(), req.getEndTime(), req.getTransTime(),  StatObjType.super_socket, req.getSuperSocketId());
+        if (Objects.isNull(analysesData))
+            return summary;
+        if (analysesData.isEmpty())
+            return summary;
+        watch.stop();
+        watch.start("包装响应数据");
+        summary.toDetail(analysesData);
+        watch.stop();
+        summary.setTime(watch.getTotalTimeMillis());
+        log.info("耗时打印{}", watch.prettyPrint());
+        return summary;
     }
 }

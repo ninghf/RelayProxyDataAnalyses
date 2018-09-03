@@ -1,13 +1,10 @@
 package com.butel.project.relay.dto;
 
 import com.alibaba.fastjson.JSONObject;
-import com.butel.project.relay.analyses.Axis;
-import com.butel.project.relay.analyses.Packet;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.List;
 import java.util.Random;
 
 /**
@@ -33,6 +30,11 @@ public class BaseReqDto {
     public void decode(JSONObject data) {
         startTime = data.getLongValue("StartTime");
         endTime = data.getLongValue("EndTime");
+        // 分析当前时间的前5分钟数据
+        long curTime = System.currentTimeMillis();
+        long _endTime = curTime - 5 * 60 * 1000;
+        if (endTime > _endTime)
+            endTime = _endTime;
 
         superSocketId = data.getString("SuperSocketID").trim();
         transTime = data.getIntValue("TransTime");

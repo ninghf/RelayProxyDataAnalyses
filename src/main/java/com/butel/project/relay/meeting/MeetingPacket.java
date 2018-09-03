@@ -1,5 +1,6 @@
 package com.butel.project.relay.meeting;
 
+import com.butel.project.relay.constant.StatDataType;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -31,9 +32,12 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
     private int expectIdx;
     @Setter
     private int diff;
+    // 统计类型
+    private StatDataType statType;
 
-    public MeetingPacket(long packetId) {
+    public MeetingPacket(long packetId, StatDataType statType) {
         this.userStat = new UserStat(packetId);
+        this.statType = statType;
     }
 
     /**
@@ -45,9 +49,11 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
     public void updateUserStatSendTime(long sendTime, String associateId, long timestamp) {
         addNetStat(associateId, sendTime);
         userStat.updateSendTime(sendTime);
-        if (this.timestamp == 0) this.timestamp = timestamp;
-        if (timestamp < this.timestamp)
-            this.timestamp = timestamp;
+        if (timestamp > 0) {
+            if (this.timestamp == 0) this.timestamp = timestamp;
+            if (timestamp < this.timestamp)
+                this.timestamp = timestamp;
+        }
     }
 
     public long sendTime() {
@@ -62,6 +68,8 @@ public class MeetingPacket implements Comparable<MeetingPacket> {
 
     public void merge(MeetingPacket packet) {
         packet.associateIds().stream().forEach(associateId -> updateUserStatSendTime(packet.sendTime(), associateId, packet.getTimestamp()));
+        if (statType == packet.statType)
+            log.debug("重复汇报首次发包：{}", this);
     }
 
     /**
